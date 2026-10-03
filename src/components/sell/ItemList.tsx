@@ -1,12 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { availability } from "@/lib/availability";
 import { money } from "@/lib/site";
 import type { Item } from "@/lib/types";
 import { SearchIcon, TagIcon } from "../icons";
+import { ItemPhoto } from "../ItemPhoto";
+import { ShareSheet } from "./ShareSheet";
 
 const FILTERS = [
   { value: "selling", label: "For sale" },
@@ -17,8 +18,9 @@ const FILTERS = [
 ] as const;
 type Filter = (typeof FILTERS)[number]["value"];
 
-export function ItemList({ items, waitingOrders, soldElsewhereIds }: { items: Item[]; waitingOrders: number; soldElsewhereIds: string[] }) {
+export function ItemList({ items, waitingOrders, soldElsewhereIds, shopName }: { items: Item[]; waitingOrders: number; soldElsewhereIds: string[]; shopName: string }) {
   const [filter, setFilter] = useState<Filter>("selling");
+  const [sharing, setSharing] = useState<Item | null>(null);
   const [q, setQ] = useState("");
   const counts = useMemo(
     () => ({
@@ -44,9 +46,14 @@ export function ItemList({ items, waitingOrders, soldElsewhereIds }: { items: It
             {counts.selling} for sale · {money(value)} listed
           </p>
         </div>
-        <Link href="/" className="text-sm font-bold text-tag-dark underline underline-offset-4">
-          View shop ↗
-        </Link>
+        <div className="flex flex-col items-end gap-1 text-sm font-bold text-tag">
+          <Link href="/" className="underline underline-offset-4">
+            View the shop ↗
+          </Link>
+          <Link href="/sell/print" className="underline underline-offset-4">
+            Print QR signs & tags
+          </Link>
+        </div>
       </header>
 
       {waitingOrders > 0 && (
@@ -57,7 +64,7 @@ export function ItemList({ items, waitingOrders, soldElsewhereIds }: { items: It
       )}
       {stillListed.map((i) => (
         <Link key={i.id} href={`/sell/items/${i.id}#elsewhere`} className="mt-3 block rounded-2xl bg-sun/40 p-4 text-sm">
-          <strong>{i.title}</strong> sold. Remember to mark it sold on {Object.keys(i.channels).map((k) => ({ facebook: "Facebook", ebay: "eBay", craigslist: "Craigslist", offerup: "OfferUp" })[k] ?? k).join(" and ")}.
+          <strong>{i.title}</strong> sold. Remember to mark it sold on {Object.keys(i.channels).map((k) => ({ facebook: "Facebook", ebay: "eBay", craigslist: "Craigslist", offerup: "OfferUp", nextdoor: "Nextdoor" })[k] ?? k).join(" and ")}.
         </Link>
       ))}
 
@@ -78,25 +85,31 @@ export function ItemList({ items, waitingOrders, soldElsewhereIds }: { items: It
         <div className="mt-10 text-center">
           <TagIcon size={48} className="mx-auto text-kraft-dark" />
           <p className="mt-3 text-lg font-bold">Nothing here yet</p>
-          <p className="text-muted">Tap the orange + to sell your first thing.</p>
-          <Link href="/sell/new" className="btn btn-primary mt-5">
-            Sell something
-          </Link>
+          <p className="text-muted">Tap the + below to sell your first thing.</p>
+          <div className="mt-5 grid gap-2">
+            <Link href="/sell/new" className="btn btn-primary">
+              Sell something
+            </Link>
+            <Link href="/sell/bulk" className="btn btn-outline">
+              Add several at once
+            </Link>
+          </div>
         </div>
       ) : (
         <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white">
           {shown.map((i) => {
             const state = availability(i);
             return (
-              <li key={i.id}>
-                <Link href={`/sell/items/${i.id}`} className="flex items-center gap-3 p-3">
-                  <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-kraft">
-                    {i.photos[0] ? <Image src={i.photos[0].url} alt="" fill sizes="64px" className="object-cover" /> : <TagIcon className="absolute inset-0 m-auto text-kraft-dark" />}
+              <li key={i.id} className="flex items-center">
+                <Link href={`/sell/items/${i.id}`} className="flex min-w-0 flex-1 items-center gap-3 p-3">
+                  <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-kraft">
+                    <ItemPhoto url={i.photos[0]?.url} alt="" sizes="64px" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold">{i.title}</p>
                     <p className="text-sm text-muted">
                       {money(i.priceCents)}
+                      {i.size && ` · ${i.size}`}
                       {i.quantity > 1 && ` · ${i.quantity} left`}
                       {i.channels.facebook && " · FB"}
                       {i.channels.ebay && " · eBay"}
@@ -104,12 +117,23 @@ export function ItemList({ items, waitingOrders, soldElsewhereIds }: { items: It
                   </div>
                   <Badge status={i.status} state={state} />
                 </Link>
+                {i.status === "live" && state === "available" && (
+                  <button type="button" onClick={() => setSharing(i)} className="mr-2 grid size-11 shrink-0 place-items-center rounded-lg text-tag hover:bg-kraft" aria-label={`Share ${i.title} / QR code`}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="4" y="4" width="6" height="6" rx="1" />
+                      <rect x="14" y="4" width="6" height="6" rx="1" />
+                      <rect x="4" y="14" width="6" height="6" rx="1" />
+                      <path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
+                    </svg>
+                  </button>
+                )}
               </li>
             );
           })}
           {!shown.length && <li className="p-6 text-center text-muted">Nothing here.</li>}
         </ul>
       )}
+      {sharing && <ShareSheet item={sharing} shopName={shopName} onClose={() => setSharing(null)} />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/settings";
+import { getSettings } from "@/lib/shop";
 
 export const metadata: Metadata = { title: "Pickup, payment & questions" };
 
@@ -21,14 +21,14 @@ export default async function AboutPage() {
       <p className="mt-4 text-lg whitespace-pre-line text-muted">{s.about}</p>
       <dl className="mt-10 space-y-4">
         {faq.map((f) => (
-          <div key={f.q} className="rounded-2xl border border-line bg-white p-5">
+          <div key={f.q} className="rounded-lg border border-line bg-white p-5">
             <dt className="text-lg font-bold">{f.q}</dt>
             <dd className="mt-1 text-ink/85">{f.a}</dd>
           </div>
         ))}
       </dl>
       {(s.contactEmail || s.contactPhone) && (
-        <div className="mt-10 rounded-2xl bg-kraft p-6">
+        <div className="mt-10 rounded-lg bg-kraft p-6">
           <h2 className="text-2xl">Questions?</h2>
           <p className="mt-2">
             {s.contactPhone && (

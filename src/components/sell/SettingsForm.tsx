@@ -5,14 +5,15 @@ import type { SiteSettings } from "@/lib/types";
 import { dollars, sellApi, toCents } from "./api";
 
 type Setup = {
-  database: boolean;
+  server: boolean;
   stripe: "test" | "live" | null;
   stripeWebhook: boolean;
   bch: boolean;
   bchFirstAddress: string | null;
   walletConnect: boolean;
   email: boolean;
-  cron: boolean;
+  publicUrl: string | null;
+  website: { state: string; message: string } | null;
   siteUrl: string;
 };
 
@@ -44,13 +45,12 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
   }
 
   const checks: { ok: boolean; label: string; hint: string }[] = [
-    { ok: setup.database, label: "Supabase (items, orders, photos)", hint: "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, and the SQL in supabase/migrations run once." },
-    { ok: Boolean(setup.stripe), label: setup.stripe ? `Stripe: ${setup.stripe === "test" ? "test mode (no real money)" : "live"}` : "Stripe (cards, Apple Pay, Google Pay)", hint: "STRIPE_SECRET_KEY from your own Stripe account." },
-    { ok: setup.stripeWebhook, label: "Stripe webhook", hint: `Stripe → Developers → Webhooks → ${setup.siteUrl}/api/stripe/webhook, then STRIPE_WEBHOOK_SECRET.` },
-    { ok: setup.bch, label: setup.bchFirstAddress ? `Bitcoin Cash (first address ${setup.bchFirstAddress.slice(12, 20)}…: check it matches your wallet)` : "Bitcoin Cash", hint: "BCH_XPUB: your shop wallet's xPub (it can't spend)." },
-    { ok: setup.walletConnect, label: "BCH Connect wallet (optional)", hint: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID from dashboard.reown.com." },
-    { ok: setup.email, label: "Order emails (optional)", hint: "RESEND_API_KEY from resend.com, and NOTIFY_EMAIL." },
-    { ok: setup.cron, label: "Daily clean-up", hint: "CRON_SECRET (any long random text)." },
+    { ok: setup.server, label: "The Mac mini", hint: "SHOP_API_URL, SHOP_API_TOKEN and SHOP_ADMIN_TOKEN in Vercel, and the server running on the mini (docs/MAC_MINI.md)." },
+    { ok: Boolean(setup.stripe), label: setup.stripe ? `Stripe: ${setup.stripe === "test" ? "test mode (no real money)" : "live"}` : "Card payments (Stripe)", hint: "STRIPE_SECRET_KEY from your personal Stripe account, in the mini's .env." },
+    { ok: setup.stripeWebhook, label: "Stripe's payment notices", hint: `Stripe → Developers → Webhooks → ${setup.publicUrl ?? "<the mini's PUBLIC_URL>"}/stripe/webhook, then STRIPE_WEBHOOK_SECRET in the mini's .env.` },
+    { ok: setup.bch, label: setup.bchFirstAddress ? `Bitcoin Cash: first address …${setup.bchFirstAddress.slice(-8)} (check it matches your wallet)` : "Bitcoin Cash", hint: "BCH_XPUB (your wallet's xPub, which can't spend) in the mini's .env." },
+    { ok: setup.walletConnect, label: "BCH “Connect wallet” (optional)", hint: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in Vercel, from dashboard.reown.com." },
+    { ok: setup.email, label: "Order emails (optional)", hint: "SMTP_USER and SMTP_PASS (a Gmail app password) in the mini's .env." },
   ];
 
   return (
@@ -111,14 +111,15 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
         </div>
 
         {msg && <p className={`rounded-xl p-3 text-sm font-bold ${msg.ok ? "bg-leaf-light text-leaf" : "bg-berry/10 text-berry"}`}>{msg.text}</p>}
-        <button type="submit" className="btn btn-primary w-full" disabled={busy || !setup.database}>
+        <button type="submit" className="btn btn-primary w-full" disabled={busy || !setup.server}>
           {busy ? "Saving…" : "Save"}
         </button>
       </form>
 
       <section className="mt-10">
         <h2 className="text-xl">Setup</h2>
-        <p className="text-sm text-muted">These are set in Vercel → your project → Settings → Environment Variables (then redeploy). The README walks through each.</p>
+        <p className="text-sm text-muted">Keys go in the Mac mini&apos;s .env (then restart it), or in Vercel where it says so. docs/MAC_MINI.md walks through each.</p>
+        {setup.website && <p className="mt-2 text-sm">Website refresh: {setup.website.message}</p>}
         <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-white">
           {checks.map((c) => (
             <li key={c.label} className="flex gap-3 p-3 text-sm">

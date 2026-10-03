@@ -19,6 +19,12 @@ const PLACES = [
     hint: "Same idea for eBay. (Posting to eBay straight from here is planned: see docs/MARKETPLACES.md.)",
   },
   {
+    key: "nextdoor" as const,
+    name: "Nextdoor",
+    create: "https://nextdoor.com/for_sale_and_free/",
+    hint: "",
+  },
+  {
     key: "craigslist" as const,
     name: "Craigslist",
     create: "https://post.craigslist.org/",
@@ -28,19 +34,15 @@ const PLACES = [
 
 /** The listing as text for another site: title, price, condition, description and a link to buy it here. */
 export function listingText(item: Item, origin: string) {
-  return [
-    item.title,
+  const facts = [
     `${item.priceCents === 0 ? "Free" : money(item.priceCents)}${item.obo ? " or best offer" : ""}`,
     `Condition: ${conditionLabel(item.condition)}`,
-    "",
-    item.description,
-    "",
-    item.pickup ? "Local pickup." : "",
-    `Pay online and it's yours: ${origin}/item/${item.slug}`,
-  ]
-    .filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i > 0))
-    .join("\n")
-    .trim();
+    item.size && `Size: ${item.size}`,
+    item.brand && `Brand: ${item.brand}`,
+  ].filter(Boolean);
+  return [item.title, facts.join("\n"), item.description, [item.pickup && "Local pickup.", `Pay online and it's yours: ${origin}/item/${item.slug}`].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /**

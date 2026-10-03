@@ -1,140 +1,103 @@
 # Personal Garage Sale
 
-My own website for selling my things: a shop that takes cards (my personal Stripe account) and
-Bitcoin Cash, plus a **Sell app** for the phone: take a photo or two, add a price and a few words,
-tap **Post it**, and it's on the site. The same app rings up in-person sales (garage sale,
-Marketplace meetups) and keeps track of orders. Facebook Marketplace and eBay: see
-[docs/MARKETPLACES.md](docs/MARKETPLACES.md).
+My own website for selling things from around the house, to neighbours, Facebook Marketplace
+buyers, and anyone who finds the link. It's a shop that takes cards (through my personal Stripe
+account), Bitcoin Cash, or payment at pickup. It comes with a **Sell app** for the phone: take a
+photo, tap a price, say what it is, tap **Post it**. The same app rings up sales at the garage
+sale itself.
 
-Built from the Om Threads Boutique site and admin, but all in one project on **Vercel**, with
-**Supabase** for the data and photos, so there's no Mac mini, Tailscale or DuckDNS to keep running.
+It's built from the Om Threads Boutique site and admin, and runs the same way: the website is on
+**Vercel**, and everything that decides something (items, photos, orders, payments) lives on the
+**Mac mini** (the `server/` folder).
 
 ```
- Phone (Sell app, /sell) ──┐                          ┌─▶ Stripe Checkout (cards, Apple/Google Pay) ──webhook──┐
-                           ├─▶ Vercel (this Next.js app) ─┤                                                        │
- Shoppers (/, /shop) ──────┘        │                     └─▶ Bitcoin Cash: public Fulcrum servers (no company)    │
-                                    ▼                                                                              │
-                        Supabase: Postgres (items, orders) + Storage (photos) ◀─────────────────────────────────────┘
+ Phone: Sell app ─┐                                                  Mac mini (server/)
+                  ├─▶ Vercel: this Next.js site ──SHOP_API_URL──▶ Caddy ─▶ garage-sale server :8797
+ Shoppers ────────┘     shop · checkout · Sell app                         SQLite · photos · Stripe · Bitcoin Cash
 ```
 
 ## What it does
 
-**The shop** (`/`, `/shop`, `/item/…`): items with photos, price stickers, condition, "or best
-offer", pickup or shipping. Search and categories. Sold items stay visible as **Sold** for two weeks.
+**The shop** (`/`, `/shop`, `/item/…`) is a plain, friendly site. Items have photos, price,
+condition, size and brand for clothes, "or best offer", and pickup or shipping. You can search and
+browse by category. Sold things stay visible as **Sold** for two weeks.
 
-**Checkout** (`/checkout`): the buyer picks
-- **Card, Apple Pay or Google Pay** through Stripe Checkout (Stripe hosts the card form),
-- **Bitcoin Cash** straight into your own wallet, with the animated payment screen from
-  [bch_cashtoken_checkout](https://github.com/btheis15/bch_cashtoken_checkout): QR code, "open in
-  wallet", optional Connect wallet, zero-conf with double-spend proofs, or
-- **Pay at pickup** (cash or Venmo), with the item held for 48 hours (you choose).
+**Checkout** lets the buyer pay
+- with a **card, Apple Pay or Google Pay** (Stripe Checkout), or
+- with **Bitcoin Cash** straight into your wallet, using the payment screen from
+  [bch_cashtoken_checkout](https://github.com/btheis15/bch_cashtoken_checkout), or
+- **at pickup** (cash or Venmo), with the item held for 48 hours.
 
-While someone is paying, the item is **held** (shown "On hold") so nobody else can buy it; if they
-don't finish, it goes back by itself. Two buyers can never get the last one (it's decided inside
-the database in one step).
+While someone pays, the item shows **On hold** and nobody else can buy it. If they don't finish,
+it goes back on sale by itself.
 
 **The Sell app** (`/sell`, add it to your home screen):
-- **Sell (+)**: take photos or pick from the library (they're shrunk on the phone and uploaded
-  straight to Supabase), price, title, condition, category, a few words → **Post it**. More
-  options: quantity, "or best offer", "was" price, shipping, featured, private notes. A half-done
-  item survives closing the app.
-- **Items**: everything, with For sale / Drafts / Sold / Hidden. Tap to edit, mark sold, hide, or
-  **List it elsewhere** (copy the text and photos for Facebook Marketplace or eBay, keep the link).
-- **Ring up**: in person, tap what they're buying, then **Cash / Venmo / Other** (recorded, and off
-  the website at once) or **They pay on their phone**: a QR code they scan to pay by card or BCH,
-  and the screen turns to **Sold!** when it lands.
-- **Orders**: To do (paid, or held for pickup), Paying now, Done. Mark paid at pickup, picked up /
-  shipped, cancel (items back for sale), notes, the buyer's contact links.
-- **Settings**: name, tagline, banner, pickup area and pickup details (only shown after buying),
-  contact, pay at pickup, shipping, and a **Setup** checklist of what's connected.
+- **Sell (+)** starts with photos (camera or library). Then the price (one tap: $1, $2, $5, $10,
+  $20, $50, Free), what it is, and the kind of thing. Clothes get a size (XS–XXL in one tap) and
+  a brand. Then the condition, and **Post it**. It remembers the kind of thing you picked last.
+  After posting: **Sell another** (opens the camera), **Share / QR code**, or **Post it on
+  Facebook too**.
+- **Add several** is for clearing out a closet. Pick a pile of photos, type a name and price under
+  each, tap "same thing as the one above" for extra angles, then post them all.
+- **Items** lists everything. Each item has a QR button (a card with a big QR code you can show
+  someone, plus Share and Copy link), and you can edit, mark it sold, hide it, or list it elsewhere.
+- **Ring up** is for selling in person: tap what they're buying, then
+  - **Cash / Venmo / Other**: recorded, and off the website at once;
+  - **They pay on their phone**: a QR code they scan to pay by card or BCH;
+  - **Send them a pay link**: the same page as a link to text, held 24 hours (a Marketplace
+    buyer can pay before they come by).
+- **Print QR signs & tags**: a yard sign with the shop's QR code, and price tags with each
+  item's QR code. At the garage sale people scan a tag and pay by card on the spot.
+- **Orders**: shows what's paid and waiting for pickup, what's being paid right now, and what's
+  done. Mark paid at pickup, mark picked up or shipped, cancel, add notes.
+- **Settings**: the shop's name, about text, pickup area (public) and pickup details (only after
+  buying), Venmo, shipping, plus a checklist of what's connected.
 
-## Setting it up (about 30 minutes)
+**Facebook Marketplace, eBay, Nextdoor**: copy the listing text, save the photos, open the site,
+and keep the listing's link. See [docs/MARKETPLACES.md](docs/MARKETPLACES.md), which also covers
+the plan for posting to eBay from the app.
 
-### 1. Supabase (the database and photos)
+## Setting it up
 
-1. At [supabase.com](https://supabase.com), **New project** (e.g. `personal-garage-sale`; the free
-   plan is plenty). Pick a region near you and save the database password somewhere.
-2. **SQL Editor → New query**, paste all of [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql), **Run**.
-   It makes the tables, the functions that hold and sell items, and the public `photos` bucket.
-3. **Project Settings → API**: copy the **Project URL** and the **service_role** secret key.
+1. **The Mac mini**: [docs/MAC_MINI.md](docs/MAC_MINI.md) covers the server, DuckDNS, Caddy,
+   launchd and backups, step by step.
+2. **Vercel**: the project `personal-garage-sale` needs the settings in [`.env.example`](.env.example):
+   `SHOP_API_URL`, the three secrets from the mini, and `ADMIN_PASSWORD`. Then redeploy.
+3. **Payments, later**: your personal Stripe keys and your BCH wallet's xPub go in the mini's
+   `server/.env` (docs/MAC_MINI.md, section 8). Until then the shop offers pay at pickup, and the
+   Sell app records cash and Venmo sales.
 
-### 2. Vercel (the website)
-
-1. [vercel.com/new](https://vercel.com/new) → import `btheis15/personal-garage-sale`. No build
-   settings to change.
-2. **Settings → Environment Variables**, from [`.env.example`](.env.example). To start:
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD`, `CRON_SECRET`.
-3. **Redeploy**. Open `https://<your-project>.vercel.app/sell`, sign in, and post something.
-
-### 3. Stripe (your personal account)
-
-1. Sign in to **your personal** Stripe account (not Om Threads'). Turn on **Test mode**.
-2. **Developers → API keys** → secret key (`sk_test_…`) into `STRIPE_SECRET_KEY`.
-3. **Developers → Webhooks → Add destination**: endpoint `https://<your site>/api/stripe/webhook`,
-   events `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.async_payment_failed`, `checkout.session.expired`. Its signing secret
-   (`whsec_…`) into `STRIPE_WEBHOOK_SECRET`. Redeploy.
-4. Buy something with the test card `4242 4242 4242 4242` (any future date, any CVC).
-5. When it works: activate the account in Stripe, then repeat 2–3 in live mode (`sk_live_…`).
-
-Selling your own used things (a garage sale) generally isn't subject to sales tax, so the
-checkout doesn't add any. Check your state's rules if you start selling things you buy to resell.
-
-### 4. Bitcoin Cash
-
-1. Make a wallet just for this in **Selene** (or Electron Cash) and copy its **xPub**
-   (Selene: Settings → Wallet → xPub). It can list the wallet's addresses but can't spend.
-2. Put it in `BCH_XPUB` and redeploy. **Sell → Settings → Setup** shows the wallet's first
-   address: check it matches the wallet's first receiving address.
-3. Optional **Connect wallet** (pay in one tap from Cashonize, Paytaca or Zapit): a free project
-   ID at [dashboard.reown.com](https://dashboard.reown.com), with your site's domain added, in
-   `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
-
-BCH has no test network: try it with a $0.25 item. Payments count at zero-conf once no
-double-spend proof turns up within a few seconds; the screen checks the blockchain itself while
-the buyer has it open, and the daily job catches anything that arrives later.
-
-### 5. Order emails (optional)
-
-A [Resend](https://resend.com) API key in `RESEND_API_KEY` sends you "Sold!" emails and the buyer
-a receipt with the pickup details. Until you verify your own domain in Resend it can only send to
-your own address, so add a domain (and `NOTIFY_FROM`) when you want buyers to get receipts.
-Without it, everything still shows in the Sell app.
-
-### 6. On your phone
-
-Open `https://<your site>/sell` in Safari → **Share → Add to Home Screen**. It opens like an app
-and stays signed in for 60 days.
+Until `SHOP_API_URL` is set, the website shows sample items, so every deploy renders a complete shop.
 
 ## Local development
 
 ```bash
+# The server
+cd server && npm ci && npm run setup-env   # set SITE_URL=http://localhost:3000 in .env
+npm run dev                                # http://127.0.0.1:8797
+
+# The website (another terminal, in the repo root)
 npm install
-cp .env.example .env.local   # optional: without it you get the sample shop
-npm run dev                  # http://localhost:3000, Sell app at /sell
+cp .env.example .env.local                 # SHOP_API_URL=http://127.0.0.1:8797 + the three secrets + ADMIN_PASSWORD
+npm run dev                                # http://localhost:3000, Sell app at /sell
 ```
 
-| Command | What it does |
-|---------|--------------|
-| `npm run dev` | Dev server |
-| `npm run build` | Production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | Route types + TypeScript |
-| `npm test` | The database functions, run in PGlite (Postgres in WebAssembly) |
+| Command | Where | What it does |
+|---------|-------|--------------|
+| `npm run dev` / `build` | root | The website |
+| `npm run lint` / `typecheck` | root | ESLint / route types + TypeScript |
+| `npm test` | `server/` | Holds, the last one never sold twice, payments, photos, the API, Bitcoin Cash against a stand-in network |
 
 ## Project layout
 
 ```
-src/app/(shop)/          the shop: home, shop, item, about, checkout, order (incl. the BCH payment screen)
-src/app/sell/            the Sell app: items, new item, edit, ring up, orders, settings (password protected)
-src/app/api/checkout     places an order (holds the items) and starts Stripe / BCH / pay at pickup
-src/app/api/orders/…     the buyer's order: status, pay or switch method, cancel, Bitcoin Cash
-src/app/api/sell/…       the Sell app's API (login, items, photo uploads, orders, ring up, settings)
-src/app/api/stripe/webhook   Stripe's "paid" / "expired" notices
-src/app/api/cron         daily clean-up (vercel.json)
+src/app/(shop)/          the shop: home, browse, item, about, checkout, order (incl. the BCH payment screen)
+src/app/sell/            the Sell app: items, sell, add several, ring up, orders, print, settings
+src/app/api/             passes the shop's and the Sell app's requests to the Mac mini; /api/revalidate
 src/components/          shop UI; sell/ is the Sell app; bch/ is the payment screen from bch_cashtoken_checkout
-src/lib/                 items, orders, settings, auth, stripe, bch (engine wiring), notify (emails)
-src/lib/bch-engine/      the Bitcoin Cash engine from bch_cashtoken_checkout, unchanged
-supabase/migrations/     the database: tables and the functions that hold, sell and release items
-test/                    tests for those functions
+src/lib/shop.ts          every request to the Mac mini, and the cached catalog
+server/src/              the Mac mini server: store.js (items, holds, orders), app.js (routes),
+                         media.js (photos), stripe.js, bch.js (+ bch-engine/), notify.js (emails)
+server/scripts/          setup-env, launchd jobs, DuckDNS, backups, update-mini
+server/test/             the server's tests
 ```

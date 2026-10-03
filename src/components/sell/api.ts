@@ -17,12 +17,15 @@ export async function sellApi<T = Record<string, unknown>>(method: string, url: 
   return data as T;
 }
 
-export type Uploaded = { path: string; url: string; width: number; height: number };
+export type Uploaded = { id: string; url: string; width: number; height: number; maxWidth: number };
 
-const MAX_SIDE = 1600;
+const MAX_SIDE = 2048;
 
-/** Turns a photo from the camera or library into a JPEG at most 1600px on its longest side. */
-async function shrink(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+/**
+ * Turns a photo from the camera or library into a JPEG at most 2048px on its longest side, so it
+ * uploads quickly over a phone connection (the Mac mini makes the smaller sizes).
+ */
+async function shrink(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(async () => {
     // Older Safari: through an <img>.
     const url = URL.createObjectURL(file);
@@ -38,31 +41,45 @@ async function shrink(file: File): Promise<{ blob: Blob; width: number; height: 
   const w = "naturalWidth" in bitmap ? bitmap.naturalWidth : bitmap.width;
   const h = "naturalHeight" in bitmap ? bitmap.naturalHeight : bitmap.height;
   const scale = Math.min(1, MAX_SIDE / Math.max(w, h));
-  const width = Math.round(w * scale);
-  const height = Math.round(h * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
   const ctx = canvas.getContext("2d")!;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(bitmap, 0, 0, width, height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   if ("close" in bitmap) bitmap.close();
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't read that photo."))), "image/jpeg", 0.85));
-  return { blob, width, height };
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't read that photo."))), "image/jpeg", 0.86));
 }
 
-/** Shrinks the photos and uploads them straight to Supabase Storage. Calls onEach as each one lands. */
-export async function uploadPhotos(files: File[], onEach: (index: number, photo: Uploaded) => void) {
-  const { uploads } = await sellApi<{ uploads: { path: string; signedUrl: string; url: string }[] }>("POST", "/api/sell/uploads", { count: files.length });
-  await Promise.all(
-    files.map(async (file, i) => {
-      const { blob, width, height } = await shrink(file);
-      const u = uploads[i];
-      const res = await fetch(u.signedUrl, { method: "PUT", headers: { "content-type": "image/jpeg", "cache-control": "max-age=31536000", "x-upsert": "false" }, body: blob });
-      if (!res.ok) throw new Error(`A photo didn't upload (${res.status}). Try again.`);
-      onEach(i, { path: u.path, url: u.url, width, height });
-    }),
-  );
+/** Uploads one photo to the Mac mini (through the website). */
+export async function uploadPhoto(file: File): Promise<Uploaded> {
+  const blob = await shrink(file).catch(() => file);
+  const form = new FormData();
+  form.append("photo", blob, "photo.jpg");
+  const res = await fetch("/api/sell/photos", { method: "POST", headers: { "x-sell-app": "1" }, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    window.location.reload();
+    throw new Error("Please sign in again.");
+  }
+  if (!res.ok) throw new Error(data.error ?? `A photo didn't upload (${res.status}). Try again.`);
+  return data.photo as Uploaded;
+}
+
+/** Uploads several, two at a time, calling onEach as each one lands (or fails). */
+export async function uploadPhotos(files: File[], onEach: (index: number, photo: Uploaded | null, error?: string) => void) {
+  let next = 0;
+  async function worker() {
+    while (next < files.length) {
+      const i = next++;
+      try {
+        onEach(i, await uploadPhoto(files[i]));
+      } catch (e) {
+        onEach(i, null, (e as Error).message);
+      }
+    }
+  }
+  await Promise.all([worker(), worker()]);
 }
 
 export const dollars = (cents: number | null | undefined) => (cents === null || cents === undefined ? "" : (cents / 100).toFixed(cents % 100 ? 2 : 0));

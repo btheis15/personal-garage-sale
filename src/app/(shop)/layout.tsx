@@ -2,8 +2,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { isSample } from "@/lib/items";
-import { getSettings } from "@/lib/settings";
+import { isSample } from "@/lib/shop";
+import { getSettings } from "@/lib/shop";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();

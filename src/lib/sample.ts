@@ -2,7 +2,7 @@ import type { PublicItem } from "./types";
 
 /**
  * What the shop shows before Supabase is set up, so every deploy renders a complete site.
- * The photos are drawings in public/sample/.
+ * The photos are drawings in public/sample/. Shown until SHOP_API_URL points at the Mac mini.
  */
 const base = {
   compareAtCents: null,
@@ -15,12 +15,14 @@ const base = {
   shippingCents: null,
   featured: false,
   channels: {},
+  size: "",
+  brand: "",
   soldAt: null,
   soldVia: null,
 };
 
 const at = (daysAgo: number) => new Date(Date.UTC(2026, 8, 30) - daysAgo * 86_400_000).toISOString();
-const photo = (name: string) => [{ path: `/sample/${name}.svg`, url: `/sample/${name}.svg`, width: 1200, height: 1200 }];
+const photo = (name: string) => [{ url: `/sample/${name}.svg`, width: 1200, height: 1200 }];
 
 export const SAMPLE_ITEMS: PublicItem[] = [
   {

@@ -6,8 +6,8 @@ import { Gallery } from "@/components/Gallery";
 import { ItemCard } from "@/components/ItemCard";
 import { BoxIcon, PinIcon, ShieldIcon, TruckIcon } from "@/components/icons";
 import { availability } from "@/lib/availability";
-import { getCatalog, getItemBySlug } from "@/lib/items";
-import { getSettings } from "@/lib/settings";
+import { getCatalog, getItemBySlug } from "@/lib/shop";
+import { getSettings } from "@/lib/shop";
 import { CONDITIONS, categoryLabel, money, siteUrl } from "@/lib/site";
 
 export async function generateStaticParams() {
@@ -74,19 +74,20 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
         <div>
           <h1 className="text-3xl md:text-4xl">{item.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="price-tag text-2xl">{item.priceCents === 0 ? "FREE" : money(item.priceCents)}</span>
+            <span className="text-3xl font-bold text-tag">{item.priceCents === 0 ? "Free" : money(item.priceCents)}</span>
             {item.compareAtCents && <span className="text-lg text-muted line-through">{money(item.compareAtCents)}</span>}
             {item.obo && state === "available" && <span className="rounded-md bg-sun px-2 py-0.5 text-sm font-bold">or best offer</span>}
           </div>
           <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-white p-3 shadow-sm">
+            <div className="rounded-lg border border-line bg-white p-3">
               <dt className="text-muted">Condition</dt>
               <dd className="font-bold">{condition?.label}</dd>
               <dd className="text-muted">{condition?.hint}</dd>
             </div>
-            <div className="rounded-xl bg-white p-3 shadow-sm">
-              <dt className="text-muted">{item.quantity > 1 ? "Available" : "Category"}</dt>
-              <dd className="font-bold">{item.quantity > 1 ? `${item.quantity} of them` : categoryLabel(item.category)}</dd>
+            <div className="rounded-lg border border-line bg-white p-3">
+              <dt className="text-muted">{item.size ? "Size" : item.quantity > 1 ? "Available" : "Category"}</dt>
+              <dd className="font-bold">{item.size || (item.quantity > 1 ? `${item.quantity} of them` : categoryLabel(item.category))}</dd>
+              {item.brand && <dd className="text-muted">{item.brand}</dd>}
             </div>
           </dl>
 
@@ -96,7 +97,7 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
           {item.obo && state === "available" && ask && (
             <p className="mt-3 text-sm">
               Want to make an offer?{" "}
-              <a href={ask} className="font-bold text-tag-dark underline underline-offset-4">
+              <a href={ask} className="font-semibold text-tag underline underline-offset-4">
                 Send me a message
               </a>
             </p>
@@ -109,7 +110,7 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
             </div>
           )}
 
-          <ul className="mt-8 space-y-3 rounded-2xl border border-line bg-white p-4 text-sm">
+          <ul className="mt-8 space-y-3 rounded-lg border border-line bg-white p-4 text-sm">
             {item.pickup && (
               <li className="flex gap-3">
                 <PinIcon className="shrink-0 text-tag" />

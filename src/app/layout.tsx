@@ -1,18 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
-import { getSettings } from "@/lib/settings";
+import { getSettings } from "@/lib/shop";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
-
-// Mukta, by Ek Type (SIL Open Font License, src/assets/fonts/OFL-Mukta.txt).
-const mukta = localFont({
-  variable: "--font-mukta",
-  display: "swap",
-  src: [
-    { path: "../assets/fonts/Mukta-Medium.ttf", weight: "400", style: "normal" },
-    { path: "../assets/fonts/Mukta-Bold.ttf", weight: "700", style: "normal" },
-  ],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
@@ -26,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#fbf8f2",
+  themeColor: "#f8f7f3",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -34,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={mukta.variable}>
+    <html lang="en">
       <body className="min-h-dvh">{children}</body>
     </html>
   );

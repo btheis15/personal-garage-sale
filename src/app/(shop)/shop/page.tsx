@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ItemCard } from "@/components/ItemCard";
 import { ShopFilters } from "@/components/ShopFilters";
 import { availability } from "@/lib/availability";
-import { getCatalog } from "@/lib/items";
+import { getCatalog } from "@/lib/shop";
 import { CATEGORIES, categoryLabel } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Everything for sale" };
@@ -45,7 +45,7 @@ export default async function ShopPage(props: PageProps<"/shop">) {
           ))}
         </div>
       ) : (
-        <p className="mt-8 rounded-2xl bg-kraft p-8 text-center text-muted">Nothing matches that. Try another search or category.</p>
+        <p className="mt-8 rounded-lg bg-kraft p-8 text-center text-muted">Nothing matches that. Try another search or category.</p>
       )}
     </div>
   );

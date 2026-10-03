@@ -7,8 +7,8 @@ export function GET() {
       start_url: "/sell",
       scope: "/sell",
       display: "standalone",
-      background_color: "#fbf8f2",
-      theme_color: "#f26a2e",
+      background_color: "#f8f7f3",
+      theme_color: "#2b4c6f",
       icons: [
         { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
         { src: "/icon.png", sizes: "512x512", type: "image/png" },

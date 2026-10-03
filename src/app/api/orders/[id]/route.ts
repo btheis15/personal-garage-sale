@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/lib/http";
-import { buyerView, getOrder } from "@/lib/orders";
+import { errorResponse, isId } from "@/lib/http";
+import { shopApi, shopperIp } from "@/lib/shop";
+import type { BuyerOrder } from "@/lib/types";
 
 /** The buyer's order, for the order page to follow along (the id is the order's own unguessable id). */
-export async function GET(_request: Request, ctx: RouteContext<"/api/orders/[id]">) {
+export async function GET(request: Request, ctx: RouteContext<"/api/orders/[id]">) {
+  const { id } = await ctx.params;
+  if (!isId(id)) return NextResponse.json({ error: "Order not found." }, { status: 404 });
   try {
-    const order = await getOrder((await ctx.params).id);
-    if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
-    return NextResponse.json(buyerView(order), { headers: { "Cache-Control": "no-store" } });
+    const { order } = await shopApi<{ order: BuyerOrder }>(`/api/orders/${id}`, { shopperIp: shopperIp(request.headers) });
+    return NextResponse.json(order, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e);
   }

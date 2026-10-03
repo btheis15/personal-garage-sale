@@ -1,38 +1,17 @@
 import { NextResponse } from "next/server";
-import { bch, hasBch } from "@/lib/bch";
-import { errorResponse, readJson } from "@/lib/http";
-import { getOrder } from "@/lib/orders";
+import { errorResponse, isId } from "@/lib/http";
+import { shopApi, shopperIp } from "@/lib/shop";
 
-const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 20_000) : "");
+const ACTIONS: Record<string, string[]> = { renew: [], wallet: ["address"], quote: ["category", "amount"], build: ["address", "category", "amount"], submit: ["hex"] };
 
-/**
- * The payment screen's other requests: renew (a new price once one ran out), and Connect wallet
- * (wallet: what it holds, quote, build: the transaction to sign, submit: the signed one).
- */
+/** The payment screen's other requests (a new price; Connect wallet), passed to the Mac mini. */
 export async function POST(request: Request, ctx: RouteContext<"/api/orders/[id]/bch/[action]">) {
+  const { id, action } = await ctx.params;
+  if (!isId(id) || !ACTIONS[action]) return NextResponse.json({ error: "Not found." }, { status: 404 });
   try {
-    const { id, action } = await ctx.params;
-    if (!hasBch()) return NextResponse.json({ error: "Payment not found." }, { status: 404 });
-    const order = await getOrder(id);
-    if (!order || order.method !== "bch") return NextResponse.json({ error: "Payment not found." }, { status: 404 });
-    const body = await readJson(request);
-    const engine = bch();
-    switch (action) {
-      case "renew":
-        // A new price only while the items are still held for this order.
-        if (order.status !== "pending") return NextResponse.json({ error: "This checkout has closed. Please start again from the shop." }, { status: 409 });
-        return NextResponse.json(await engine.renew(id));
-      case "wallet":
-        return NextResponse.json(await engine.walletInfo(id, str(body.address)));
-      case "quote":
-        return NextResponse.json(await engine.walletQuote(id, { category: str(body.category), amount: str(body.amount) }));
-      case "build":
-        return NextResponse.json(await engine.walletBuild(id, { address: str(body.address), category: str(body.category), amount: str(body.amount) }));
-      case "submit":
-        return NextResponse.json(await engine.walletSubmit(id, str(body.hex)));
-      default:
-        return NextResponse.json({ error: "Not found." }, { status: 404 });
-    }
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const pass = Object.fromEntries(ACTIONS[action].filter((k) => typeof body[k] === "string").map((k) => [k, body[k]]));
+    return NextResponse.json(await shopApi(`/api/orders/${id}/bch/${action}`, { method: "POST", body: pass, shopperIp: shopperIp(request.headers) }));
   } catch (e) {
     return errorResponse(e);
   }

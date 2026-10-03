@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { SellNav } from "@/components/sell/SellNav";
 import { SignIn } from "@/components/sell/SignIn";
 import { hasPassword, isSignedIn } from "@/lib/auth";
-import { hasDatabase } from "@/lib/db";
+import { hasShop } from "@/lib/shop";
 
 export const metadata: Metadata = {
   title: { default: "Sell", template: "%s · Sell" },
@@ -11,14 +11,14 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Sell", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: "#f26a2e" };
+export const viewport: Viewport = { themeColor: "#2b4c6f" };
 
 export default async function SellLayout({ children }: { children: React.ReactNode }) {
   if (!(await isSignedIn())) return <SignIn ready={hasPassword()} />;
   return (
-    <div className="min-h-dvh bg-paper pb-[calc(5rem+env(safe-area-inset-bottom))]">
-      {!hasDatabase && (
-        <div className="bg-sun px-4 py-2 text-center text-sm font-bold">Supabase isn&apos;t connected yet, so nothing can be saved. See the README, then Settings → Setup.</div>
+    <div className="min-h-dvh bg-paper pb-[calc(5rem+env(safe-area-inset-bottom))] print:bg-white print:pb-0">
+      {!hasShop && (
+        <div className="bg-sun px-4 py-2 text-center text-sm font-bold">The Mac mini isn&apos;t connected yet (SHOP_API_URL), so nothing can be saved. See docs/MAC_MINI.md.</div>
       )}
       {children}
       <SellNav />

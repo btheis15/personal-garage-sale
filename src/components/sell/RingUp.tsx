@@ -1,27 +1,31 @@
 "use client";
 
 import "../bch/bch-pay.css";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { availability } from "@/lib/availability";
 import { money } from "@/lib/site";
 import type { Item, Order } from "@/lib/types";
 import { QrCode } from "../bch/parts";
-import { CheckIcon, MinusIcon, PlusIcon, SearchIcon, TagIcon } from "../icons";
+import { CheckIcon, MinusIcon, PlusIcon, SearchIcon } from "../icons";
+import { ItemPhoto } from "../ItemPhoto";
 import { sellApi } from "./api";
 
 type Line = { item: Item; qty: number };
 
 /**
- * Selling in person: tap what they're buying, then take cash or Venmo (recorded as paid, and off
- * the website straight away), or show a QR code so they pay on their own phone by card or
- * Bitcoin Cash.
+ * Selling in person: tap what they're buying, then
+ *   - Cash / Venmo / Other: recorded as paid, and off the website straight away;
+ *   - "They pay on their phone": a QR code they scan to pay by card or Bitcoin Cash, right here;
+ *   - "Send a pay link": the same page as a link to text someone (a Marketplace buyer paying
+ *     before they come by), with the items held for them meanwhile.
  */
-export function RingUp({ items, online, venmo }: { items: Item[]; online: { stripe: boolean; bch: boolean }; venmo: string }) {
+export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]; online: { stripe: boolean; bch: boolean }; venmo: string; preselect?: string[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(() => items.filter((i) => preselect.includes(i.id) && availability(i) === "available").map((item) => ({ item, qty: 1 })));
+  const [linkOrder, setLinkOrder] = useState<Order | null>(null);
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
@@ -35,12 +39,18 @@ export function RingUp({ items, online, venmo }: { items: Item[]; online: { stri
   const toggle = (item: Item) => setLines((ls) => (ls.some((l) => l.item.id === item.id) ? ls.filter((l) => l.item.id !== item.id) : [...ls, { item, qty: 1 }]));
   const setQty = (id: string, qty: number) => setLines((ls) => ls.map((l) => (l.item.id === id ? { ...l, qty: Math.max(1, Math.min(Math.max(1, l.item.quantity), qty)) } : l)));
 
-  async function charge(method: "cash" | "venmo" | "other" | "qr") {
+  async function charge(method: "cash" | "venmo" | "other" | "qr" | "link") {
     setBusy(method);
     setError(null);
     try {
-      const { order } = await sellApi<{ order: Order }>("POST", "/api/sell/charge", { lines: lines.map((l) => ({ id: l.item.id, qty: l.qty })), method });
+      const { order } = await sellApi<{ order: Order }>("POST", "/api/sell/charge", {
+        lines: lines.map((l) => ({ id: l.item.id, qty: l.qty })),
+        method: method === "qr" || method === "link" ? "link" : method,
+        // A link sent by text: held a day, so they have time to pay.
+        ...(method === "link" ? { holdHours: 24 } : {}),
+      });
       if (method === "qr") setQrOrder(order);
+      else if (method === "link") setLinkOrder(order);
       else setDone(order);
       setLines([]);
       router.refresh();
@@ -91,6 +101,47 @@ export function RingUp({ items, online, venmo }: { items: Item[]; online: { stri
       </div>
     );
 
+  if (linkOrder) {
+    const url = `${window.location.origin}/order/${linkOrder.id}`;
+    const text = `Here's the link to pay for ${linkOrder.items.map((i) => i.title).join(", ")} (${money(linkOrder.totalCents)}): ${url}`;
+    return (
+      <div className="mx-auto max-w-lg px-4 pt-8 text-center">
+        <p className="eyebrow">Order #{linkOrder.number} · held for 24 hours</p>
+        <h1 className="mt-1 text-4xl">{money(linkOrder.totalCents)}</h1>
+        <p className="mt-2 text-muted">Send them this link. They can pay {[online.stripe && "by card, Apple Pay or Google Pay", online.bch && "with Bitcoin Cash"].filter(Boolean).join(" or ")}; it shows up under Orders when they do.</p>
+        <p className="mt-4 rounded-lg border border-line bg-white p-3 text-sm break-all">{url}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {"share" in navigator ? (
+            <button type="button" className="btn btn-primary" onClick={() => navigator.share({ text, url }).catch(() => {})}>
+              Share
+            </button>
+          ) : (
+            <a className="btn btn-primary" href={`sms:?&body=${encodeURIComponent(text)}`}>
+              Text it
+            </a>
+          )}
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={async () => {
+              await navigator.clipboard.writeText(url).catch(() => prompt("Copy this link:", url));
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy link"}
+          </button>
+        </div>
+        <button type="button" className="btn btn-outline mt-2 w-full" onClick={() => (setQrOrder(linkOrder), setLinkOrder(null))}>
+          Show it as a QR code instead
+        </button>
+        <button type="button" className="mt-6 text-sm text-muted underline underline-offset-4" onClick={() => (setLinkOrder(null), router.refresh())}>
+          Done
+        </button>
+      </div>
+    );
+  }
+
   if (qrOrder) {
     const url = `${window.location.origin}/order/${qrOrder.id}`;
     return (
@@ -98,7 +149,7 @@ export function RingUp({ items, online, venmo }: { items: Item[]; online: { stri
         <p className="eyebrow">Order #{qrOrder.number}</p>
         <h1 className="mt-1 text-4xl">{money(qrOrder.totalCents)}</h1>
         <p className="mt-2 text-muted">Have them scan this with their phone&apos;s camera to pay {[online.stripe && "by card, Apple Pay or Google Pay", online.bch && "with Bitcoin Cash"].filter(Boolean).join(" or ")}.</p>
-        <div className="bchpay mx-auto mt-6 flex justify-center" style={{ "--bchpay-accent": "#f26a2e", "--bchpay-ink": "#1f2328", "--bchpay-bg": "#ffffff" } as React.CSSProperties}>
+        <div className="bchpay mx-auto mt-6 flex justify-center" style={{ "--bchpay-accent": "#2b4c6f", "--bchpay-ink": "#1f2328", "--bchpay-bg": "#ffffff" } as React.CSSProperties}>
           <QrCode text={url} size={260} label="Pay on your phone" logo="/icon.png" listening />
         </div>
         <p className="mt-6 flex items-center justify-center gap-2 font-bold">
@@ -126,7 +177,7 @@ export function RingUp({ items, online, venmo }: { items: Item[]; online: { stri
           return (
             <button key={i.id} type="button" onClick={() => toggle(i)} className={`relative overflow-hidden rounded-xl border-2 bg-white text-left transition ${on ? "border-tag" : "border-transparent"}`} aria-pressed={Boolean(on)}>
               <div className="relative aspect-square bg-kraft">
-                {i.photos[0] ? <Image src={i.photos[0].url} alt="" fill sizes="33vw" className="object-cover" /> : <TagIcon className="absolute inset-0 m-auto text-kraft-dark" />}
+                <ItemPhoto url={i.photos[0]?.url} alt="" sizes="33vw" />
                 {on && (
                   <span className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-tag text-white">
                     <CheckIcon size={14} strokeWidth={3} />
@@ -182,6 +233,13 @@ export function RingUp({ items, online, venmo }: { items: Item[]; online: { stri
             <button type="button" className="btn btn-dark mt-2 w-full" disabled={busy !== null} onClick={() => charge("qr")}>
               {busy === "qr" ? "Making the QR code…" : `They pay on their phone (${[online.stripe && "card", online.bch && "BCH"].filter(Boolean).join(" / ")})`}
             </button>
+          )}
+          {online.stripe || online.bch ? (
+            <button type="button" className="mt-2 w-full py-1 text-sm font-bold text-tag underline underline-offset-4" disabled={busy !== null} onClick={() => charge("link")}>
+              {busy === "link" ? "Making the link…" : "Or send them a pay link (held 24 hours)"}
+            </button>
+          ) : (
+            <p className="mt-2 text-center text-xs text-muted">Scan-to-pay QR codes and pay links appear here once card or Bitcoin Cash payments are set up.</p>
           )}
         </div>
       )}

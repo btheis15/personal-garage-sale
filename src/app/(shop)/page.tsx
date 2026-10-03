@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ItemCard } from "@/components/ItemCard";
 import { PinIcon, ShieldIcon, TagIcon } from "@/components/icons";
 import { availability } from "@/lib/availability";
-import { getCatalog } from "@/lib/items";
-import { getSettings } from "@/lib/settings";
+import { getCatalog } from "@/lib/shop";
+import { getSettings } from "@/lib/shop";
 import { CATEGORIES } from "@/lib/site";
 
 export default async function Home() {
@@ -16,44 +16,38 @@ export default async function Home() {
 
   return (
     <>
-      <section className="border-b border-line bg-[radial-gradient(circle_at_85%_10%,var(--color-tag-light),transparent_45%),radial-gradient(circle_at_10%_90%,#fff3c4,transparent_40%)]">
-        <div className="container-page grid gap-8 py-12 md:grid-cols-[1.3fr_1fr] md:items-center md:py-20">
+      <section className="border-b border-line bg-white">
+        <div className="container-page grid gap-8 py-10 md:grid-cols-[1.4fr_1fr] md:items-center md:py-16">
           <div>
-            <p className="eyebrow">{forSale.length ? `${forSale.length} ${forSale.length === 1 ? "thing" : "things"} for sale` : "New things coming soon"}</p>
-            <h1 className="mt-3 text-5xl md:text-7xl">{settings.name}</h1>
-            <p className="mt-4 max-w-xl text-xl text-muted">{settings.tagline}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <p className="eyebrow">{forSale.length ? `${forSale.length} ${forSale.length === 1 ? "thing" : "things"} for sale right now` : "New things coming soon"}</p>
+            <h1 className="mt-2 text-4xl md:text-6xl">{settings.name}</h1>
+            <p className="mt-3 max-w-xl text-xl text-muted">{settings.tagline}</p>
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/shop" className="btn btn-primary">
-                Browse everything
+                See everything for sale
               </Link>
               <Link href="/about" className="btn btn-outline">
-                How pickup works
+                About & pickup
               </Link>
             </div>
           </div>
-          <ul className="grid gap-3 text-base">
-            <li className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 shadow-sm">
-              <PinIcon className="mt-0.5 shrink-0 text-tag" />
-              <span>
-                <strong>Pick it up</strong>
-                <span className="block text-muted">{settings.pickupArea}</span>
-              </span>
-            </li>
-            <li className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 shadow-sm">
-              <ShieldIcon className="mt-0.5 shrink-0 text-leaf" />
-              <span>
-                <strong>Pay securely online</strong>
-                <span className="block text-muted">Card, Apple Pay, Google Pay or Bitcoin Cash{settings.payAtPickup ? ", or pay at pickup" : ""}</span>
-              </span>
-            </li>
-            <li className="flex items-start gap-3 rounded-2xl bg-white/80 p-4 shadow-sm">
-              <TagIcon className="mt-0.5 shrink-0 text-sky" />
-              <span>
-                <strong>Buy it now, it&apos;s yours</strong>
-                <span className="block text-muted">Paid items come off the site straight away</span>
-              </span>
-            </li>
-          </ul>
+          <div className="rounded-xl border border-line bg-paper p-5">
+            <p className="leading-relaxed text-ink/85">{settings.about}</p>
+            <ul className="mt-4 space-y-2 text-sm">
+              <li className="flex items-start gap-2">
+                <PinIcon size={18} className="mt-0.5 shrink-0 text-tag" />
+                <span>{settings.pickupArea}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <ShieldIcon size={18} className="mt-0.5 shrink-0 text-leaf" />
+                <span>Pay by card, Apple Pay, Google Pay or Bitcoin Cash{settings.payAtPickup ? ", or pay at pickup" : ""}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <TagIcon size={18} className="mt-0.5 shrink-0 text-sky" />
+                <span>Once it&apos;s paid for, it comes off the site and it&apos;s yours</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -61,7 +55,7 @@ export default async function Home() {
         <section className="container-page mt-10">
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
             {categories.map((c) => (
-              <Link key={c.value} href={`/shop?category=${c.value}`} className="shrink-0 rounded-full border border-line bg-white px-4 py-2 font-bold hover:border-ink">
+              <Link key={c.value} href={`/shop?category=${c.value}`} className="shrink-0 rounded-full border border-line bg-white px-4 py-2 font-semibold hover:border-tag hover:text-tag">
                 {c.label}
               </Link>
             ))}
@@ -71,7 +65,7 @@ export default async function Home() {
 
       {featured.length > 0 && (
         <section className="container-page mt-12">
-          <h2 className="text-3xl">Worth a look</h2>
+          <h2 className="text-2xl md:text-3xl">Worth a look</h2>
           <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
             {featured.map((item, i) => (
               <ItemCard key={item.id} item={item} priority={i < 2} />
@@ -82,8 +76,8 @@ export default async function Home() {
 
       <section className="container-page mt-12">
         <div className="flex items-end justify-between gap-4">
-          <h2 className="text-3xl">Just listed</h2>
-          <Link href="/shop" className="font-bold text-tag-dark hover:underline">
+          <h2 className="text-2xl md:text-3xl">Just listed</h2>
+          <Link href="/shop" className="font-semibold text-tag hover:underline">
             See all →
           </Link>
         </div>
@@ -94,7 +88,7 @@ export default async function Home() {
             ))}
           </div>
         ) : (
-          <p className="mt-5 rounded-2xl bg-kraft p-8 text-center text-muted">Nothing for sale right now. Check back soon!</p>
+          <p className="mt-5 rounded-lg bg-kraft p-8 text-center text-muted">Nothing for sale right now. Check back soon!</p>
         )}
       </section>
 

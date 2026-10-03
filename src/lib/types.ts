@@ -2,16 +2,19 @@ export type Condition = "new" | "like_new" | "good" | "fair" | "for_parts";
 export type ItemStatus = "draft" | "live" | "sold" | "hidden";
 
 export type Photo = {
-  /** Path in the "photos" storage bucket (or a full URL for the sample catalog). */
-  path: string;
+  /** The photo's id on the Mac mini (none for the sample drawings). */
+  id?: string;
+  /** /media/<id>/<maxWidth>.webp, served through the website's own address. */
   url: string;
   width: number;
   height: number;
+  /** The largest copy the Mac mini made (smaller ones: 320, 480, 640, 828, 1080, 1280, 1600). */
+  maxWidth?: number;
 };
 
 /** Where else an item is listed (Facebook Marketplace, eBay…), recorded in the Sell app. */
 export type ChannelListing = { url?: string; listedAt?: string; id?: string };
-export type Channels = Partial<Record<"facebook" | "ebay" | "craigslist" | "offerup", ChannelListing>>;
+export type Channels = Partial<Record<"facebook" | "ebay" | "craigslist" | "offerup" | "nextdoor", ChannelListing>>;
 
 export type Item = {
   id: string;
@@ -22,6 +25,9 @@ export type Item = {
   compareAtCents: number | null;
   condition: Condition;
   category: string;
+  /** Clothing and shoes: "M", "10.5", "Boys 8"… */
+  size: string;
+  brand: string;
   photos: Photo[];
   status: ItemStatus;
   /** How many are left (lowered while a checkout holds them). */
@@ -52,6 +58,26 @@ export type OrderStatus = "pending" | "reserved" | "paid" | "completed" | "cance
 export type PayMethod = "stripe" | "bch" | "cash" | "venmo" | "other";
 
 export type OrderLine = { id: string; slug?: string; title: string; priceCents: number; qty: number; photo?: string | null };
+
+/** What the buyer's order page shows (no private notes). */
+export type BuyerOrder = {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  method: PayMethod | null;
+  channel: "web" | "in_person";
+  items: (OrderLine & { photoUrl: string | null })[];
+  subtotalCents: number;
+  shippingCents: number;
+  totalCents: number;
+  fulfillment: "pickup" | "ship";
+  holdUntil: string | null;
+  paidAt: string | null;
+  name: string | null;
+};
+
+/** Which ways to pay the Mac mini has switched on. */
+export type Payments = { stripe: boolean; stripeTest: boolean; bch: boolean };
 
 export type Customer = {
   name?: string;

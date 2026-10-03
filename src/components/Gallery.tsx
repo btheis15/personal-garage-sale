@@ -22,7 +22,7 @@ export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title
 
   if (!photos.length)
     return (
-      <div className="relative aspect-square overflow-hidden rounded-2xl bg-kraft">
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-kraft">
         <ItemPhoto url={null} alt={title} sizes="100vw" />
       </div>
     );
@@ -30,9 +30,9 @@ export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title
   return (
     <div className={dim ? "opacity-70 grayscale" : ""}>
       <div className="relative">
-        <div ref={strip} onScroll={onScroll} className="no-scrollbar flex aspect-square snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-2xl bg-kraft">
+        <div ref={strip} onScroll={onScroll} className="no-scrollbar flex aspect-square snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-lg bg-kraft">
           {photos.map((p, i) => (
-            <div key={p.path} className="relative h-full w-full shrink-0 snap-center">
+            <div key={p.url} className="relative h-full w-full shrink-0 snap-center">
               <ItemPhoto url={p.url} alt={i === 0 ? title : `${title}, photo ${i + 1}`} sizes="(min-width: 768px) 50vw, 100vw" priority={i === 0} fit="contain" />
             </div>
           ))}
@@ -47,7 +47,7 @@ export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title
             </button>
             <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
               {photos.map((p, i) => (
-                <span key={p.path} className={`h-1.5 rounded-full bg-white shadow transition-all ${i === index ? "w-5" : "w-1.5 opacity-60"}`} />
+                <span key={p.url} className={`h-1.5 rounded-full bg-white shadow transition-all ${i === index ? "w-5" : "w-1.5 opacity-60"}`} />
               ))}
             </div>
           </>
@@ -56,7 +56,7 @@ export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title
       {photos.length > 1 && (
         <div className="mt-3 hidden gap-2 md:flex">
           {photos.map((p, i) => (
-            <button key={p.path} type="button" onClick={() => goTo(i)} className={`relative size-20 overflow-hidden rounded-lg bg-kraft ring-2 transition ${i === index ? "ring-tag" : "ring-transparent opacity-70 hover:opacity-100"}`} aria-label={`Photo ${i + 1}`}>
+            <button key={p.url} type="button" onClick={() => goTo(i)} className={`relative size-20 overflow-hidden rounded-lg bg-kraft ring-2 transition ${i === index ? "ring-tag" : "ring-transparent opacity-70 hover:opacity-100"}`} aria-label={`Photo ${i + 1}`}>
               <ItemPhoto url={p.url} alt="" sizes="80px" />
             </button>
           ))}

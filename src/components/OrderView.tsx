@@ -4,7 +4,7 @@ import "./bch/bch-pay.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { BuyerOrder } from "@/lib/orders";
+import type { BuyerOrder } from "@/lib/types";
 import { money, PAY_METHOD_LABEL } from "@/lib/site";
 import type { BchApi } from "./bch/api";
 import { BchPay } from "./bch/BchPay";
@@ -117,7 +117,7 @@ export function OrderView({
   return (
     <div className="container-page max-w-2xl py-8 md:py-12">
       {paid ? (
-        <div className="animate-pop rounded-3xl bg-leaf-light p-6 text-center">
+        <div className="animate-pop rounded-xl bg-leaf-light p-6 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-full bg-leaf text-white">
             <CheckIcon size={30} strokeWidth={3} />
           </span>
@@ -127,14 +127,14 @@ export function OrderView({
           </p>
         </div>
       ) : order.status === "reserved" ? (
-        <div className="rounded-3xl bg-sky/10 p-6 text-center">
+        <div className="rounded-xl bg-sky/10 p-6 text-center">
           <h1 className="text-3xl">On hold for you</h1>
           <p className="mt-1">
             Order #{order.number} is held{order.holdUntil ? ` until ${when(order.holdUntil)}` : ""}. Pay {money(order.totalCents)} at pickup: cash{shop.venmo ? ` or Venmo (${shop.venmo})` : ""}.
           </p>
         </div>
       ) : order.status === "cancelled" || order.status === "expired" ? (
-        <div className="rounded-3xl bg-kraft p-6 text-center">
+        <div className="rounded-xl bg-kraft p-6 text-center">
           <h1 className="text-3xl">This order {order.status === "expired" ? "timed out" : "was cancelled"}</h1>
           <p className="mt-1 text-muted">Nothing was charged. If the items are still for sale, you can buy them again.</p>
           <Link href="/shop" className="btn btn-primary mt-4">
@@ -167,14 +167,14 @@ export function OrderView({
             style={
               {
                 "--bchpay-bg": "#ffffff",
-                "--bchpay-soft": "#efe6d6",
-                "--bchpay-line": "#e5dccb",
-                "--bchpay-ink": "#1f2328",
-                "--bchpay-muted": "#6b6f76",
-                "--bchpay-accent": "#f26a2e",
-                "--bchpay-accent-light": "#ffe2d2",
-                "--bchpay-accent-2": "#ffcf4a",
-                "--bchpay-ok": "#2f8a57",
+                "--bchpay-soft": "#efece5",
+                "--bchpay-line": "#e2ded5",
+                "--bchpay-ink": "#22272e",
+                "--bchpay-muted": "#646b73",
+                "--bchpay-accent": "#2b4c6f",
+                "--bchpay-accent-light": "#e7eef5",
+                "--bchpay-accent-2": "#3d7a4f",
+                "--bchpay-ok": "#3d7a4f",
                 "--bchpay-font": "var(--font-sans)",
                 "--bchpay-font-display": "var(--font-display)",
               } as React.CSSProperties
@@ -186,7 +186,7 @@ export function OrderView({
       {order.status === "pending" && (order.method !== "bch" || !bchView) && (
         <div className="mt-6 space-y-3">
           {returnedFromCard ? (
-            <p className="rounded-2xl bg-white p-5 text-center shadow-sm">Confirming your payment with Stripe…</p>
+            <p className="rounded-lg bg-white p-5 text-center shadow-sm">Confirming your payment with Stripe…</p>
           ) : (
             <>
               <p className="font-bold">
@@ -213,7 +213,7 @@ export function OrderView({
         </p>
       )}
 
-      <section className="mt-8 rounded-2xl border border-line bg-white p-5">
+      <section className="mt-8 rounded-lg border border-line bg-white p-5">
         <ul className="divide-y divide-line">
           {order.items.map((i) => (
             <li key={i.id} className="flex items-center gap-3 py-3">
@@ -241,7 +241,7 @@ export function OrderView({
       </section>
 
       {(paid || order.status === "reserved") && (
-        <section className="mt-6 rounded-2xl bg-kraft p-5">
+        <section className="mt-6 rounded-lg bg-kraft p-5">
           <h2 className="text-xl">{order.fulfillment === "ship" ? "Shipping" : "Pickup"}</h2>
           <p className="mt-2 whitespace-pre-line">
             {order.fulfillment === "ship" ? "I'll ship it in the next couple of days and email you the tracking number." : shop.pickupInstructions}

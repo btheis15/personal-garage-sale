@@ -19,10 +19,10 @@ export function BuyButtons({ item }: { item: PublicItem }) {
   const state = now ? availability(item, now * 30_000) : availability(item);
   const inCart = items.some((i) => i.id === item.id);
 
-  if (state === "sold") return <p className="rounded-xl bg-ink px-4 py-3 text-center font-bold text-paper">Sold. Sorry!</p>;
+  if (state === "sold") return <p className="rounded-lg bg-kraft px-4 py-3 text-center font-bold">Sold, sorry! Have a look at what else is for sale.</p>;
   if (state === "on_hold")
     return (
-      <p className="rounded-xl bg-sky/10 px-4 py-3 text-center font-bold text-sky">
+      <p className="rounded-lg bg-tag-light px-4 py-3 text-center font-semibold text-tag">
         On hold: someone is paying for it right now. If they don&apos;t, it&apos;s back shortly.
       </p>
     );

@@ -1,12 +1,13 @@
 import type { Condition, SiteSettings } from "./types";
 
+/** Before the Mac mini has any settings saved (the same defaults as server/src/site.js). */
 export const DEFAULT_SETTINGS: SiteSettings = {
   name: "Brian's Garage Sale",
-  tagline: "Good stuff, fair prices, local pickup.",
+  tagline: "Things from around our house that we don't need anymore.",
   about:
-    "Everything here is mine: things I no longer use, priced to move. Most items are pickup only. Pay online with a card or Bitcoin Cash, or hold it and pay when you pick it up.",
-  pickupArea: "Near me: set your area in Sell → Settings",
-  pickupInstructions: "I'll email you to set up a pickup time. Please reply with a time that works for you.",
+    "Hi, I'm Brian. We live in town with our family, and like every family we end up with more stuff than we need. Everything here is ours, priced to go to a good home. Most things are pickup from our driveway; you can pay online by card or Bitcoin Cash, or hold it and pay when you come by.",
+  pickupArea: "Local pickup (set your area in Sell → Settings)",
+  pickupInstructions: "I'll send you our address and we'll find a time that works. Usually evenings and weekends.",
   contactEmail: "",
   contactPhone: "",
   payAtPickup: true,
@@ -51,10 +52,8 @@ export const PAY_METHOD_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-/** How long a card or Bitcoin Cash checkout holds the items (Stripe's shortest session is 30 minutes). */
-export const CHECKOUT_HOLD_MINUTES = 35;
-/** How long an in-person QR checkout holds the items while the buyer pays on their phone. */
-export const IN_PERSON_HOLD_MINUTES = 20;
+/** Common sizes, one tap each in the Sell app (anything else can be typed). */
+export const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Kids", "One size"];
 
 export function siteUrl() {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
@@ -68,15 +67,3 @@ export const money = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
 export const moneyExact = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-export function slugify(title: string) {
-  return (
-    title
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "item"
-  );
-}

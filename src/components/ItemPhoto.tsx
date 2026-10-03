@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { isMedia, mediaLoader } from "@/lib/image";
 import { TagIcon } from "./icons";
 
 /** An item's photo, filling its (relatively positioned) box; a plain tile when there's none. */
@@ -17,8 +20,8 @@ export function ItemPhoto({ url, alt, sizes, priority = false, fit = "cover" }: 
       sizes={sizes}
       priority={priority}
       className={fit === "cover" ? "object-cover" : "object-contain"}
-      // Sample drawings are SVGs; uploaded photos go through Vercel's image optimizer.
-      unoptimized={url.endsWith(".svg")}
+      // The Mac mini already made every size; sample drawings are SVGs.
+      {...(isMedia(url) ? { loader: mediaLoader } : { unoptimized: true })}
     />
   );
 }

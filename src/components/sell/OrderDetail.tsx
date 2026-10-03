@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { money, PAY_METHOD_LABEL } from "@/lib/site";
 import type { Order } from "@/lib/types";
-import { ChevronLeft, TagIcon } from "../icons";
+import { ChevronLeft } from "../icons";
+import { ItemPhoto } from "../ItemPhoto";
 import { sellApi } from "./api";
 import { ago, STATUS_LABEL } from "./OrderList";
 
@@ -61,7 +61,7 @@ export function OrderDetail({ order: initial, photos, bch }: { order: Order; pho
         {order.items.map((i) => (
           <li key={i.id} className="flex items-center gap-3 p-3">
             <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-kraft">
-              {photos[i.id] ? <Image src={photos[i.id]!} alt="" fill sizes="56px" className="object-cover" /> : <TagIcon className="absolute inset-0 m-auto text-kraft-dark" />}
+              <ItemPhoto url={photos[i.id]} alt="" sizes="56px" />
             </div>
             <p className="min-w-0 flex-1">
               {i.qty > 1 && `${i.qty} × `}

@@ -15,7 +15,7 @@ export const hasPassword = () => password().length >= 8;
 
 function signingKey() {
   return createHash("sha256")
-    .update(`${process.env.SESSION_SECRET ?? ""}\0${password()}\0${process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""}`)
+    .update(`${process.env.SESSION_SECRET ?? ""}\0${password()}\0${process.env.SHOP_ADMIN_TOKEN ?? ""}`)
     .digest();
 }
 

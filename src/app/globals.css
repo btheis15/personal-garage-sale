@@ -1,29 +1,31 @@
 @import "tailwindcss";
 
 /*
- * The look: a sunny Saturday garage sale. Paper-white tables, kraft-paper boxes, ink-black
- * marker, and the orange of a price sticker. Change these to re-theme the whole shop.
+ * The look: a neighbor's own website. Plain white and warm off-white, navy like a good flannel,
+ * a little green for "available", and the system's own fonts. Nothing flashy. Change these to
+ * re-theme everything (the names are kept short: "tag" is the main navy).
  */
 @theme {
-  --color-paper: #fbf8f2;
-  --color-kraft: #efe6d6;
-  --color-kraft-dark: #d9c8aa;
-  --color-line: #e5dccb;
-  --color-ink: #1f2328;
-  --color-muted: #6b6f76;
-  /* Price stickers and the main buttons. */
-  --color-tag: #f26a2e;
-  --color-tag-dark: #c94d17;
-  --color-tag-light: #ffe2d2;
-  /* "Sold", "On hold" and other notes. */
-  --color-sky: #2f6fdb;
-  --color-leaf: #2f8a57;
-  --color-leaf-light: #dcf2e4;
-  --color-sun: #ffcf4a;
-  --color-berry: #c2335b;
+  --color-paper: #f8f7f3;
+  --color-kraft: #efece5;
+  --color-kraft-dark: #cfc8ba;
+  --color-line: #e2ded5;
+  --color-ink: #22272e;
+  --color-muted: #646b73;
+  /* Buttons, links, prices: navy. */
+  --color-tag: #2b4c6f;
+  --color-tag-dark: #1e3651;
+  --color-tag-light: #e7eef5;
+  --color-sky: #3a6f9e;
+  /* Available, paid. */
+  --color-leaf: #3d7a4f;
+  --color-leaf-light: #e3f0e6;
+  /* "Price drop", gentle notes. */
+  --color-sun: #f4e5a6;
+  --color-berry: #b03a3a;
 
-  --font-sans: var(--font-mukta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-mukta), ui-rounded, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-sans);
 
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -44,15 +46,15 @@
   h3 {
     font-family: var(--font-display);
     font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
   }
   :focus-visible {
     outline: 2px solid var(--color-tag);
     outline-offset: 2px;
   }
   ::selection {
-    background: var(--color-sun);
+    background: var(--color-tag-light);
     color: var(--color-ink);
   }
 }
@@ -74,9 +76,9 @@
   gap: 0.5rem;
   min-height: 3rem;
   padding-inline: 1.4rem;
-  border-radius: 0.9rem;
+  border-radius: 0.6rem;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
   transition:
     background-color 0.2s,
     color 0.2s,
@@ -94,22 +96,21 @@
 @utility btn-primary {
   background: var(--color-tag);
   color: white;
-  box-shadow: 0 2px 0 var(--color-tag-dark);
   &:hover:not(:disabled) {
     background: var(--color-tag-dark);
   }
 }
 
 @utility btn-dark {
-  background: var(--color-ink);
+  background: var(--color-leaf);
   color: var(--color-paper);
   &:hover:not(:disabled) {
-    background: #000;
+    background: #2f6340;
   }
 }
 
 @utility btn-outline {
-  border: 1.5px solid var(--color-ink);
+  border: 1px solid var(--color-kraft-dark);
   color: var(--color-ink);
   background: white;
   &:hover:not(:disabled) {
@@ -119,8 +120,8 @@
 
 @utility eyebrow {
   font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-muted);
 }
@@ -128,8 +129,8 @@
 @utility field {
   width: 100%;
   min-height: 3rem;
-  border-radius: 0.75rem;
-  border: 1.5px solid var(--color-line);
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-kraft-dark);
   background: white;
   padding: 0.6rem 0.85rem;
   font-size: 1rem;
@@ -147,30 +148,16 @@
   }
 }
 
-/* The price sticker: a round-cornered tag with a punched hole. */
+/* A price, plainly: on a photo it sits on a small white label. */
 @utility price-tag {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.7rem 0.2rem 1.25rem;
-  border-radius: 0.35rem 0.6rem 0.6rem 0.35rem;
-  background: var(--color-tag);
-  color: white;
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 0.4rem;
+  background: white;
+  color: var(--color-ink);
   font-weight: 700;
-  line-height: 1.4;
-  clip-path: polygon(0.6rem 0, 100% 0, 100% 100%, 0.6rem 100%, 0 50%);
-  &::before {
-    content: "";
-    position: absolute;
-    left: 0.55rem;
-    top: 50%;
-    width: 0.32rem;
-    height: 0.32rem;
-    margin-top: -0.16rem;
-    border-radius: 9999px;
-    background: var(--color-paper);
-  }
+  line-height: 1.5;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
 }
 
 @keyframes page-in {

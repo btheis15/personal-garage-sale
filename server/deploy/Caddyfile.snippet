@@ -1,0 +1,9 @@
+# --- Personal garage sale: the server (garage-sale-server) ----------------------
+# Add this block to the Mac mini's Caddyfile (/opt/homebrew/etc/Caddyfile),
+# below the existing ones (Om Threads' stays as it is), then:
+#   caddy validate --config /opt/homebrew/etc/Caddyfile && brew services restart caddy
+# Use your own DuckDNS name in place of brian-garage-sale.
+brian-garage-sale.duckdns.org {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8797
+}
