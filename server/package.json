@@ -1,0 +1,31 @@
+{
+  "name": "garage-sale-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The garage sale's back end on the Mac mini: items, photos, orders, Stripe and Bitcoin Cash.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js",
+    "setup-env": "node scripts/setup-env.js",
+    "backup": "node scripts/backup.js"
+  },
+  "dependencies": {
+    "@bitauth/libauth": "3.0.0",
+    "@electrum-cash/network": "4.4.8",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "multer": "^2.4.0",
+    "nodemailer": "10.0.13",
+    "sharp": "^0.35.4",
+    "stripe": "^22.6.2"
+  }
+}
