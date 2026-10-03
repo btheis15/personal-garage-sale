@@ -70,15 +70,17 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
         </Link>
       </nav>
       <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-        <Gallery photos={item.photos} title={item.title} dim={state === "sold"} />
+        <Gallery photos={item.photos} title={item.title} slug={item.slug} dim={state === "sold"} />
         <div>
-          <h1 className="text-3xl md:text-4xl">{item.title}</h1>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="text-3xl font-bold text-tag">{item.priceCents === 0 ? "Free" : money(item.priceCents)}</span>
+          <h1 className="animate-rise text-4xl md:text-5xl" style={{ "--i": 0 } as React.CSSProperties}>
+            {item.title}
+          </h1>
+          <div className="animate-rise mt-3 flex flex-wrap items-center gap-3" style={{ "--i": 1 } as React.CSSProperties}>
+            <span className="font-display text-4xl font-semibold text-tag">{item.priceCents === 0 ? "Free" : money(item.priceCents)}</span>
             {item.compareAtCents && <span className="text-lg text-muted line-through">{money(item.compareAtCents)}</span>}
             {item.obo && state === "available" && <span className="rounded-md bg-sun px-2 py-0.5 text-sm font-bold">or best offer</span>}
           </div>
-          <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
+          <dl className="animate-rise mt-5 grid grid-cols-2 gap-3 text-sm" style={{ "--i": 2 } as React.CSSProperties}>
             <div className="rounded-lg border border-line bg-white p-3">
               <dt className="text-muted">Condition</dt>
               <dd className="font-bold">{condition?.label}</dd>
@@ -91,7 +93,7 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
             </div>
           </dl>
 
-          <div className="mt-6">
+          <div className="animate-rise mt-6" style={{ "--i": 3 } as React.CSSProperties}>
             <BuyButtons item={item} />
           </div>
           {item.obo && state === "available" && ask && (
@@ -104,13 +106,13 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
           )}
 
           {item.description && (
-            <div className="mt-8">
-              <h2 className="text-xl">About it</h2>
+            <div className="mt-8" data-reveal>
+              <h2 className="text-2xl">About it</h2>
               <div className="mt-2 space-y-3 whitespace-pre-line text-ink/90">{item.description}</div>
             </div>
           )}
 
-          <ul className="mt-8 space-y-3 rounded-lg border border-line bg-white p-4 text-sm">
+          <ul className="mt-8 space-y-3 rounded-2xl border border-line bg-white p-5 text-sm" data-reveal>
             {item.pickup && (
               <li className="flex gap-3">
                 <PinIcon className="shrink-0 text-tag" />
@@ -151,10 +153,12 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
 
       {more.length > 0 && (
         <section className="mt-16">
-          <h2 className="text-2xl">More {categoryLabel(item.category).toLowerCase()}</h2>
+          <h2 className="text-3xl" data-reveal>
+            More {categoryLabel(item.category).toLowerCase()}
+          </h2>
           <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
-            {more.map((i) => (
-              <ItemCard key={i.id} item={i} />
+            {more.map((i, n) => (
+              <ItemCard key={i.id} item={i} index={n} morph />
             ))}
           </div>
         </section>

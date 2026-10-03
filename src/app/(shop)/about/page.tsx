@@ -17,11 +17,11 @@ export default async function AboutPage() {
   ];
   return (
     <div className="container-page max-w-3xl py-10">
-      <h1 className="text-4xl">Pickup, payment & questions</h1>
+      <h1 className="animate-rise text-4xl md:text-5xl">Pickup, payment & questions</h1>
       <p className="mt-4 text-lg whitespace-pre-line text-muted">{s.about}</p>
       <dl className="mt-10 space-y-4">
         {faq.map((f) => (
-          <div key={f.q} className="rounded-lg border border-line bg-white p-5">
+          <div key={f.q} className="rounded-2xl border border-line bg-white p-5" data-reveal>
             <dt className="text-lg font-bold">{f.q}</dt>
             <dd className="mt-1 text-ink/85">{f.a}</dd>
           </div>

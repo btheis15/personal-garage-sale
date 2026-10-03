@@ -1,31 +1,33 @@
 @import "tailwindcss";
 
 /*
- * The look: a neighbor's own website. Plain white and warm off-white, navy like a good flannel,
- * a little green for "available", and the system's own fonts. Nothing flashy. Change these to
- * re-theme everything (the names are kept short: "tag" is the main navy).
+ * The look: a family's own website, warm and tidy. Cream like a sunny kitchen, navy like a good
+ * flannel, a little sunlight amber, sage for "available". Fraunces (a friendly serif) for
+ * headings, Inter for everything else. The motion comes from the Om Threads site.
+ * Change these to re-theme everything ("tag" is the main navy).
  */
 @theme {
-  --color-paper: #f8f7f3;
-  --color-kraft: #efece5;
-  --color-kraft-dark: #cfc8ba;
-  --color-line: #e2ded5;
-  --color-ink: #22272e;
-  --color-muted: #646b73;
-  /* Buttons, links, prices: navy. */
-  --color-tag: #2b4c6f;
-  --color-tag-dark: #1e3651;
-  --color-tag-light: #e7eef5;
+  --color-paper: #fbf8f1;
+  --color-kraft: #f2ece0;
+  --color-kraft-dark: #d8cdb8;
+  --color-line: #e7dfcf;
+  --color-ink: #1f2a37;
+  --color-muted: #66707c;
+  /* Buttons, links, dark bands: navy. */
+  --color-tag: #2c4a6b;
+  --color-tag-dark: #1b2f47;
+  --color-tag-light: #e6edf4;
+  /* Highlights: late-afternoon sun. */
+  --color-amber: #d9952b;
+  --color-amber-light: #f5ddb0;
   --color-sky: #3a6f9e;
-  /* Available, paid. */
-  --color-leaf: #3d7a4f;
+  --color-leaf: #3f7d56;
   --color-leaf-light: #e3f0e6;
-  /* "Price drop", gentle notes. */
-  --color-sun: #f4e5a6;
-  --color-berry: #b03a3a;
+  --color-sun: #f6e2a6;
+  --color-berry: #b5443b;
 
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: var(--font-sans);
+  --font-sans: var(--font-inter), ui-sans-serif, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
 
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -45,9 +47,12 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+  }
+  main {
+    overflow-x: clip;
   }
   :focus-visible {
     outline: 2px solid var(--color-tag);
@@ -76,7 +81,7 @@
   gap: 0.5rem;
   min-height: 3rem;
   padding-inline: 1.4rem;
-  border-radius: 0.6rem;
+  border-radius: 9999px;
   font-size: 1rem;
   font-weight: 600;
   transition:
@@ -98,6 +103,14 @@
   color: white;
   &:hover:not(:disabled) {
     background: var(--color-tag-dark);
+  }
+}
+
+@utility btn-light {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  &:hover:not(:disabled) {
+    background: var(--color-amber-light);
   }
 }
 
@@ -160,10 +173,81 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
 }
 
+/* ------------------------------------------------------------------------ */
+/* Motion (from the Om Threads site)                                         */
+/* ------------------------------------------------------------------------ */
+
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0);
+    transform: translate3d(0, 12px, 0);
+  }
+}
+@keyframes kenburns {
+  from {
+    transform: scale(1.12) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1) translate3d(0, -1.5%, 0);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.6em, 0);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+@keyframes float {
+  50% {
+    transform: translate3d(0, -8px, 0) rotate(-3deg);
+  }
+}
+@keyframes bump {
+  30% {
+    transform: scale(1.35);
+  }
+  60% {
+    transform: scale(0.9);
+  }
+}
+@keyframes parallax {
+  from {
+    transform: translate3d(0, -6%, 0) scale(1.12);
+  }
+  to {
+    transform: translate3d(0, 6%, 0) scale(1.12);
+  }
+}
+/* A photo dropped onto the table: falls in, turning, and settles at its own angle (--r). */
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -40px, 0) rotate(calc(var(--r, 0deg) - 14deg)) scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--r, 0deg));
+  }
+}
+@keyframes sway {
+  50% {
+    transform: rotate(calc(var(--r, 0deg) + 1.5deg)) translate3d(0, -6px, 0);
   }
 }
 @keyframes drawer-in {
@@ -194,17 +278,30 @@
     opacity: 1;
   }
 }
-@keyframes wiggle {
-  25% {
-    transform: rotate(-4deg);
-  }
-  75% {
-    transform: rotate(4deg);
+@keyframes fade-out {
+  to {
+    opacity: 0;
   }
 }
 
 .animate-page-in {
   animation: page-in 0.45s var(--ease-soft) both;
+}
+.animate-kenburns {
+  animation: kenburns 14s var(--ease-soft) both;
+}
+.animate-rise {
+  animation: rise 1.1s var(--ease-soft) both;
+  animation-delay: calc(var(--i, 0) * 110ms + 150ms);
+}
+.animate-spin-slow {
+  animation: spin-slow 60s linear infinite;
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-bump {
+  animation: bump 0.5s var(--ease-soft);
 }
 .animate-drawer-in {
   animation: drawer-in 0.35s var(--ease-soft) both;
@@ -218,8 +315,94 @@
 .animate-pop {
   animation: pop 0.45s var(--ease-soft) both;
 }
-.hover-wiggle:hover {
-  animation: wiggle 0.35s ease;
+.polaroid {
+  transform: rotate(var(--r, 0deg));
+  animation:
+    drop-in 1.1s var(--ease-soft) both,
+    sway 7s 1.4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 160ms + 300ms), calc(var(--i, 0) * 700ms + 1.6s);
+}
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Scroll-driven parallax where supported (Chrome, Edge, Safari 26+). */
+@supports (animation-timeline: view()) {
+  .parallax {
+    animation: parallax linear both;
+    animation-timeline: view();
+  }
+}
+
+/* Scroll reveals: hidden only when JS is running (html.js) to reveal them. */
+.js [data-reveal] {
+  transition:
+    opacity 0.9s var(--ease-soft),
+    transform 0.9s var(--ease-soft),
+    clip-path 1.2s var(--ease-soft),
+    filter 0.9s var(--ease-soft);
+  transition-delay: calc(var(--i, 0) * 80ms);
+}
+.js [data-reveal]:not(.is-visible) {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+}
+.js [data-reveal="fade"]:not(.is-visible) {
+  transform: none;
+}
+.js [data-reveal="grow"]:not(.is-visible) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+/* Image reveal: fades in while the photo settles from a slow zoom. */
+.js [data-reveal="curtain"]:not(.is-visible) {
+  transform: none;
+}
+.js [data-reveal="curtain"] img {
+  transition: transform 1.8s var(--ease-soft);
+}
+.js [data-reveal="curtain"]:not(.is-visible) img {
+  transform: scale(1.18);
+}
+/* Line drawings: their paths need pathLength="1". */
+.js [data-reveal="draw"] path,
+.js [data-reveal="draw"] circle,
+.js [data-reveal="draw"] rect {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 2s var(--ease-soft) 0.2s;
+}
+.js [data-reveal="draw"]:not(.is-visible) {
+  opacity: 1;
+  transform: none;
+}
+.js [data-reveal="draw"]:not(.is-visible) path,
+.js [data-reveal="draw"]:not(.is-visible) circle,
+.js [data-reveal="draw"]:not(.is-visible) rect {
+  stroke-dashoffset: 1;
+}
+
+/* Route transitions (React <ViewTransition>): a photo morphs from its card to the item page. */
+::view-transition-group(.morph) {
+  animation-duration: 450ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: via-blur;
+}
+@keyframes via-blur {
+  30% {
+    filter: blur(3px);
+  }
+}
+::view-transition-old(.page) {
+  animation: 180ms ease-out both fade-out;
+}
+::view-transition-new(.page) {
+  animation: 420ms var(--ease-soft) both page-in;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -229,5 +412,9 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .js [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

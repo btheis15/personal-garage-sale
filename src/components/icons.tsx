@@ -87,3 +87,8 @@ export const BoxIcon = (p: IconProps) => (
     <path d="M3 8l9 4 9-4M12 12v8" />
   </Icon>
 );
+export const MenuIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </Icon>
+);

@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, ViewTransition } from "react";
 import type { Photo } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "./icons";
+import { itemVtName } from "./ItemCard";
 import { ItemPhoto } from "./ItemPhoto";
 
 /** Swipe through the photos on a phone; thumbnails and arrows on a computer. */
-export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title: string; dim?: boolean }) {
+export function Gallery({ photos, title, slug, dim = false }: { photos: Photo[]; title: string; slug: string; dim?: boolean }) {
   const [index, setIndex] = useState(0);
   const strip = useRef<HTMLDivElement>(null);
 
@@ -30,12 +31,24 @@ export function Gallery({ photos, title, dim = false }: { photos: Photo[]; title
   return (
     <div className={dim ? "opacity-70 grayscale" : ""}>
       <div className="relative">
-        <div ref={strip} onScroll={onScroll} className="no-scrollbar flex aspect-square snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-lg bg-kraft">
-          {photos.map((p, i) => (
-            <div key={p.url} className="relative h-full w-full shrink-0 snap-center">
-              <ItemPhoto url={p.url} alt={i === 0 ? title : `${title}, photo ${i + 1}`} sizes="(min-width: 768px) 50vw, 100vw" priority={i === 0} fit="contain" />
-            </div>
-          ))}
+        <div ref={strip} onScroll={onScroll} className="no-scrollbar flex aspect-square snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-2xl bg-kraft shadow-[0_24px_50px_-28px_rgba(31,42,55,0.45)]">
+          {photos.map((p, i) => {
+            const slide = (
+              <div className="relative h-full w-full shrink-0 snap-center">
+                <ItemPhoto url={p.url} alt={i === 0 ? title : `${title}, photo ${i + 1}`} sizes="(min-width: 768px) 50vw, 100vw" priority={i === 0} fit="contain" />
+              </div>
+            );
+            // The first photo morphs in from the card that was tapped.
+            return i === 0 ? (
+              <ViewTransition key={p.url} name={itemVtName(slug)} share="morph" default="none">
+                {slide}
+              </ViewTransition>
+            ) : (
+              <div key={p.url} className="contents">
+                {slide}
+              </div>
+            );
+          })}
         </div>
         {photos.length > 1 && (
           <>

@@ -36,12 +36,12 @@ export default async function ShopPage(props: PageProps<"/shop">) {
 
   return (
     <div className="container-page py-8">
-      <h1 className="text-4xl">{category ? categoryLabel(category) : "Everything for sale"}</h1>
+      <h1 className="animate-rise text-4xl md:text-5xl">{category ? categoryLabel(category) : "Everything for sale"}</h1>
       <ShopFilters categories={categories.map((c) => ({ value: c.value, label: c.label }))} sorts={SORTS} current={{ category, q: one(sp.q), sort, sold: showSold, ships }} />
       {items.length ? (
         <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((item, i) => (
-            <ItemCard key={item.id} item={item} priority={i < 4} />
+            <ItemCard key={item.id} item={item} priority={i < 4} index={i} morph />
           ))}
         </div>
       ) : (

@@ -40,7 +40,7 @@ export function CartDrawer() {
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <p className="text-2xl font-bold">Nothing here yet</p>
+            <p className="font-display text-3xl">Nothing here yet</p>
             <p className="text-muted">Have a look around: new things go up all the time.</p>
             <Link href="/shop" className="btn btn-primary" onClick={() => cart.close()} tabIndex={t}>
               Browse everything
@@ -49,8 +49,12 @@ export function CartDrawer() {
         ) : (
           <>
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-4 md:px-6">
-              {items.map((item) => (
-                <li key={item.id} className="flex gap-4 py-4">
+              {items.map((item, i) => (
+                <li
+                  key={item.id}
+                  className="flex gap-4 py-4 transition duration-500 ease-soft"
+                  style={{ transitionDelay: open ? `${150 + i * 60}ms` : "0ms", opacity: open ? 1 : 0, transform: open ? "none" : "translateX(16px)" }}
+                >
                   <Link href={`/item/${item.slug}`} onClick={() => cart.close()} tabIndex={t} className="relative aspect-square w-20 shrink-0 overflow-hidden rounded-lg bg-kraft">
                     <ItemPhoto url={item.photo} alt={item.title} sizes="80px" />
                   </Link>
