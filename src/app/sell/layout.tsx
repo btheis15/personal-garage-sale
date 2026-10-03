@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ScreenTransition } from "@/components/sell/ScreenTransition";
 import { SellNav } from "@/components/sell/SellNav";
 import { SignIn } from "@/components/sell/SignIn";
 import { hasPassword, isSignedIn } from "@/lib/auth";
@@ -20,7 +21,7 @@ export default async function SellLayout({ children }: { children: React.ReactNo
       {!hasShop && (
         <div className="bg-sun px-4 py-2 text-center text-sm font-bold">The Mac mini isn&apos;t connected yet (SHOP_API_URL), so nothing can be saved. See docs/MAC_MINI.md.</div>
       )}
-      {children}
+      <ScreenTransition>{children}</ScreenTransition>
       <SellNav />
     </div>
   );

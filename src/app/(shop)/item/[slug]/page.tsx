@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BuyButtons } from "@/components/BuyButtons";
 import { Gallery } from "@/components/Gallery";
+import { StickyBuyBar } from "@/components/StickyBuyBar";
 import { ItemCard } from "@/components/ItemCard";
 import { BoxIcon, PinIcon, ShieldIcon, TruckIcon } from "@/components/icons";
 import { availability } from "@/lib/availability";
@@ -93,7 +94,7 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
             </div>
           </dl>
 
-          <div className="animate-rise mt-6" style={{ "--i": 3 } as React.CSSProperties}>
+          <div id="buy-buttons" className="animate-rise mt-6" style={{ "--i": 3 } as React.CSSProperties}>
             <BuyButtons item={item} />
           </div>
           {item.obo && state === "available" && ask && (
@@ -163,6 +164,7 @@ export default async function ItemPage(props: PageProps<"/item/[slug]">) {
           </div>
         </section>
       )}
+      <StickyBuyBar item={item} watchId="buy-buttons" />
     </div>
   );
 }

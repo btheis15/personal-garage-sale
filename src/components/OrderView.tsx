@@ -11,7 +11,7 @@ import { BchPay } from "./bch/BchPay";
 import type { BchView } from "./bch/types";
 import { createBchWalletConnect } from "./bch/walletConnect";
 import { cart } from "./cart/store";
-import { CheckIcon } from "./icons";
+import { DoneTick } from "./motion/DoneTick";
 import { ItemPhoto } from "./ItemPhoto";
 
 type Shop = { name: string; pickupInstructions: string; pickupArea: string; venmo: string; contactEmail: string; contactPhone: string };
@@ -118,9 +118,7 @@ export function OrderView({
     <div className="container-page max-w-2xl py-8 md:py-12">
       {paid ? (
         <div className="animate-pop rounded-xl bg-leaf-light p-6 text-center">
-          <span className="mx-auto grid size-14 place-items-center rounded-full bg-leaf text-white">
-            <CheckIcon size={30} strokeWidth={3} />
-          </span>
+          <DoneTick size={64} />
           <h1 className="mt-3 text-3xl">It&apos;s yours{order.name ? `, ${order.name.split(" ")[0]}` : ""}!</h1>
           <p className="mt-1 text-ink/80">
             Order #{order.number} is paid{order.method ? ` (${PAY_METHOD_LABEL[order.method]})` : ""}. Thank you!

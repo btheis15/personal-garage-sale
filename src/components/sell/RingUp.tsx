@@ -7,7 +7,10 @@ import { availability } from "@/lib/availability";
 import { money } from "@/lib/site";
 import type { Item, Order } from "@/lib/types";
 import { QrCode } from "../bch/parts";
+import { chime } from "@/lib/chime";
 import { CheckIcon, MinusIcon, PlusIcon, SearchIcon } from "../icons";
+import { CopyButton } from "../motion/CopyButton";
+import { DoneTick } from "../motion/DoneTick";
 import { ItemPhoto } from "../ItemPhoto";
 import { sellApi } from "./api";
 
@@ -25,7 +28,6 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
   const [q, setQ] = useState("");
   const [lines, setLines] = useState<Line[]>(() => items.filter((i) => preselect.includes(i.id) && availability(i) === "available").map((item) => ({ item, qty: 1 })));
   const [linkOrder, setLinkOrder] = useState<Order | null>(null);
-  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
@@ -51,7 +53,10 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
       });
       if (method === "qr") setQrOrder(order);
       else if (method === "link") setLinkOrder(order);
-      else setDone(order);
+      else {
+        setDone(order);
+        chime();
+      }
       setLines([]);
       router.refresh();
     } catch (e) {
@@ -70,6 +75,7 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
       if (o.status === "paid" || o.status === "completed") {
         setDone({ ...qrOrder, status: o.status, method: o.method });
         setQrOrder(null);
+        chime();
         router.refresh();
       } else if (o.status === "cancelled" || o.status === "expired") {
         setError("That checkout closed without a payment. The items are back for sale.");
@@ -90,10 +96,8 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
   if (done)
     return (
       <div className="mx-auto max-w-lg px-4 pt-14 text-center">
-        <span className="animate-pop mx-auto grid size-20 place-items-center rounded-full bg-leaf text-white">
-          <CheckIcon size={44} strokeWidth={3} />
-        </span>
-        <h1 className="mt-4 text-4xl">Sold! {money(done.totalCents)}</h1>
+        <DoneTick size={88} />
+        <h1 className="animate-rise mt-5 text-4xl">Sold! {money(done.totalCents)}</h1>
         <p className="mt-2 text-muted">{done.items.map((i) => i.title).join(", ")}</p>
         <button type="button" className="btn btn-primary mt-8 w-full" onClick={() => setDone(null)}>
           Next sale
@@ -120,17 +124,7 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
               Text it
             </a>
           )}
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={async () => {
-              await navigator.clipboard.writeText(url).catch(() => prompt("Copy this link:", url));
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1800);
-            }}
-          >
-            {copied ? "Copied ✓" : "Copy link"}
-          </button>
+          <CopyButton text={url} />
         </div>
         <button type="button" className="btn btn-outline mt-2 w-full" onClick={() => (setQrOrder(linkOrder), setLinkOrder(null))}>
           Show it as a QR code instead
@@ -153,7 +147,7 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
           <QrCode text={url} size={260} label="Pay on your phone" logo="/icon.png" listening />
         </div>
         <p className="mt-6 flex items-center justify-center gap-2 font-bold">
-          <span className="size-2.5 animate-pulse rounded-full bg-leaf" /> Waiting for their payment…
+          <span className="pulse-dot size-2.5 rounded-full bg-leaf" /> Waiting for their payment…
         </p>
         <button type="button" onClick={cancelQr} className="mt-8 text-sm text-muted underline underline-offset-4">
           Cancel this sale
@@ -175,7 +169,7 @@ export function RingUp({ items, online, venmo, preselect = [] }: { items: Item[]
         {shown.map((i) => {
           const on = has(i.id);
           return (
-            <button key={i.id} type="button" onClick={() => toggle(i)} className={`relative overflow-hidden rounded-xl border-2 bg-white text-left transition ${on ? "border-tag" : "border-transparent"}`} aria-pressed={Boolean(on)}>
+            <button key={i.id} type="button" onClick={() => toggle(i)} className={`relative overflow-hidden rounded-xl border-2 bg-white text-left transition ${on ? "pick border-tag" : "border-transparent"}`} aria-pressed={Boolean(on)}>
               <div className="relative aspect-square bg-kraft">
                 <ItemPhoto url={i.photos[0]?.url} alt="" sizes="33vw" />
                 {on && (

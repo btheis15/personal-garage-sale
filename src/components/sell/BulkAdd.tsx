@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CATEGORIES } from "@/lib/site";
 import type { Item } from "@/lib/types";
-import { CheckIcon, ChevronLeft, CloseIcon } from "../icons";
+import { ChevronLeft, CloseIcon } from "../icons";
+import { DoneTick } from "../motion/DoneTick";
 import { ItemPhoto } from "../ItemPhoto";
 import { sellApi, toCents, uploadPhotos, type Uploaded } from "./api";
 
@@ -100,9 +101,7 @@ export function BulkAdd() {
   if (done)
     return (
       <div className="mx-auto max-w-lg px-4 pt-10 text-center">
-        <span className="animate-pop mx-auto grid size-16 place-items-center rounded-full bg-leaf text-white">
-          <CheckIcon size={34} strokeWidth={3} />
-        </span>
+        <DoneTick size={72} />
         <h1 className="mt-4 text-3xl">{done.length} {done.length === 1 ? "item is" : "items are"} in the shop</h1>
         <div className="mt-6 grid gap-2">
           <button type="button" className="btn btn-primary" onClick={() => (setDone(null), picker.current?.click())}>
@@ -148,7 +147,7 @@ export function BulkAdd() {
 
       <ol className="mt-4 space-y-3">
         {rows.map((r, i) => (
-          <li key={r.key} className="rounded-xl border border-line bg-white p-3">
+          <li key={r.key} className="animate-rise-in rounded-xl border border-line bg-white p-3" style={{ "--i": i % 6 } as React.CSSProperties}>
             <div className="flex gap-3">
               <div className="flex shrink-0 flex-col gap-1">
                 {r.shots.map((s) => (

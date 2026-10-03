@@ -405,6 +405,200 @@
   animation: 420ms var(--ease-soft) both page-in;
 }
 
+/* ------------------------------------------------------------------------ */
+/* The Sell app's motion (from the Om Threads Sell app)                      */
+/* ------------------------------------------------------------------------ */
+
+/* A chip or choice bounces a little when it's picked. */
+@keyframes pick {
+  45% {
+    transform: scale(1.06);
+  }
+}
+.pick {
+  animation: pick 0.36s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+/* Screens slide in from the side when you switch tabs. */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 0, 0);
+  }
+}
+.animate-screen-in {
+  animation: screen-in 0.38s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* Sheets: a blurred scrim, and the sheet rising from the bottom (dragged down with --drag). */
+@keyframes sheet-rise {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+.scrim {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: fade-in 0.24s ease-out both;
+}
+.sheet {
+  transform: translate3d(0, var(--drag, 0px), 0);
+  animation: sheet-rise 0.34s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.sheet.dragging {
+  transition: none;
+}
+.sheet.closing {
+  transform: translate3d(0, 110%, 0);
+}
+
+/* The share card pops in; its parts rise after it. */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translate3d(0, 8px, 0);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+}
+.animate-card-in {
+  animation: card-in 0.5s 0.06s cubic-bezier(0.2, 1.1, 0.35, 1) both;
+}
+.animate-rise-in {
+  animation: rise-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 160ms);
+}
+
+/* The QR code ripples out from the middle, then a sheen passes over it. */
+@property --reveal {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 150%;
+}
+@keyframes qr-ripple {
+  from {
+    --reveal: 0%;
+  }
+  to {
+    --reveal: 150%;
+  }
+}
+@keyframes sheen {
+  to {
+    transform: translateX(130%);
+  }
+}
+.qr-reveal {
+  position: relative;
+  overflow: hidden;
+}
+.qr-reveal > svg {
+  animation: qr-ripple 0.75s 0.15s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+  -webkit-mask-image: radial-gradient(circle, #000 calc(var(--reveal) - 20%), transparent var(--reveal));
+  mask-image: radial-gradient(circle, #000 calc(var(--reveal) - 20%), transparent var(--reveal));
+}
+.qr-reveal::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.8) 50%, transparent 65%);
+  transform: translateX(-130%);
+  animation: sheen 0.9s 0.7s ease-in-out both;
+}
+
+/* Copy: "Copied" rolls up into place, the button turns green and a tick draws itself. */
+.copy-roll {
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+}
+.copy-roll .face {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition:
+    opacity 0.2s ease,
+    transform 0.38s cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+.copy-roll .ok {
+  opacity: 0;
+  transform: translateY(14px) scale(0.9);
+}
+.copy-roll.done {
+  background: var(--color-leaf);
+  border-color: var(--color-leaf);
+  color: white;
+  animation: bump 0.4s cubic-bezier(0.2, 1.3, 0.35, 1);
+}
+.copy-roll.done .idle {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.9);
+}
+.copy-roll.done .ok {
+  opacity: 1;
+  transform: none;
+}
+.copy-roll .ok path {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+}
+.copy-roll.done .ok path {
+  animation: draw 0.34s 0.12s ease-out forwards;
+}
+
+/* Done: the circle pops, the tick draws itself, and a ring spreads out. */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ring-out {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+.done-tick {
+  position: relative;
+  animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  box-shadow: 0 8px 24px rgb(63 125 86 / 0.35);
+}
+.done-tick::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 3px solid var(--color-leaf);
+  animation: ring-out 0.9s 0.3s ease-out both;
+}
+.done-tick path {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: draw 0.4s 0.25s ease-out forwards;
+}
+
+/* A soft pulse while waiting for a payment. */
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1.3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -416,5 +610,9 @@
   .js [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
+  }
+  .done-tick path,
+  .copy-roll .ok path {
+    stroke-dashoffset: 0;
   }
 }

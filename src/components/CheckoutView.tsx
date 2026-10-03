@@ -202,7 +202,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
 
 function Choice({ active, onClick, label, hint }: { active: boolean; onClick: () => void; label: string; hint: string }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-start gap-3 rounded-lg border-2 bg-white p-4 text-left transition ${active ? "border-tag bg-tag-light/40" : "border-line hover:border-kraft-dark"}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`flex items-start gap-3 rounded-lg border-2 bg-white p-4 text-left transition ${active ? "pick border-tag bg-tag-light/40" : "border-line hover:border-kraft-dark"}`}>
       <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${active ? "border-tag bg-tag text-white" : "border-kraft-dark"}`}>{active && <CheckIcon size={12} strokeWidth={3} />}</span>
       <span>
         <span className="block font-bold">{label}</span>

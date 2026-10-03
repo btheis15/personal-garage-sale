@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CATEGORIES, CONDITIONS, SIZES } from "@/lib/site";
 import type { Condition, Item, ItemStatus } from "@/lib/types";
-import { CameraIcon, CheckIcon, ChevronLeft, ChevronRight, CloseIcon } from "../icons";
+import { CameraIcon, ChevronLeft, ChevronRight, CloseIcon } from "../icons";
+import { DoneTick } from "../motion/DoneTick";
 import { ItemPhoto } from "../ItemPhoto";
 import { dollars, sellApi, toCents, uploadPhotos, type Uploaded } from "./api";
 import { ShareSheet } from "./ShareSheet";
@@ -196,7 +197,7 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
     if (openCamera) camera.current?.click();
   }
 
-  const chip = (on: boolean) => `shrink-0 rounded-full border px-3.5 py-2 text-sm font-bold transition ${on ? "border-tag bg-tag text-white" : "border-line bg-white text-ink"}`;
+  const chip = (on: boolean) => `shrink-0 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${on ? "pick border-tag bg-tag text-white" : "border-line bg-white text-ink"}`;
   const fileInputs = (
     <>
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
@@ -208,17 +209,15 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
     return (
       <div className="mx-auto max-w-lg px-4 pt-10 text-center">
         {fileInputs}
-        <span className="animate-pop mx-auto grid size-16 place-items-center rounded-full bg-leaf text-white">
-          <CheckIcon size={34} strokeWidth={3} />
-        </span>
-        <h1 className="mt-4 text-3xl">{posted.status === "live" ? "It's in the shop" : "Saved as a draft"}</h1>
+        <DoneTick size={72} />
+        <h1 className="animate-rise mt-5 text-3xl">{posted.status === "live" ? "It's in the shop" : "Saved as a draft"}</h1>
         {posted.photos[0] && (
-          <div className="relative mx-auto mt-5 size-40 overflow-hidden rounded-xl bg-kraft">
+          <div className="animate-card-in relative mx-auto mt-5 size-40 rotate-2 overflow-hidden rounded-sm border-[6px] border-white bg-kraft shadow-[0_18px_40px_-14px_rgba(31,42,55,0.45)]">
             <ItemPhoto url={posted.photos[0].url} alt="" sizes="160px" />
           </div>
         )}
         <p className="mt-3 text-lg font-bold">{posted.title}</p>
-        <div className="mt-6 grid gap-2">
+        <div className="animate-rise-in mt-6 grid gap-2" style={{ "--i": 3 } as React.CSSProperties}>
           <button type="button" className="btn btn-primary" onClick={() => another(true)}>
             <CameraIcon /> Sell another
           </button>
