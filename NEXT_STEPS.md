@@ -7,13 +7,21 @@ website in the browser.
 
 ---
 
-## Where things stand (as of Oct 3, 2026)
+## Where things stand (as of Oct 8, 2026)
 
-- **Code:** all merged to `main` in `btheis15/personal-garage-sale` (PR #1). Nothing is waiting on a branch.
-- **Vercel:** the project `personal-garage-sale` deploys `main` automatically. It's live, but
-  shows **sample items** because it isn't connected to the Mac mini yet (`SHOP_API_URL` is empty).
-- **Mac mini:** nothing installed yet. This is the main job.
-- **Stripe, Bitcoin Cash, emails:** code is ready; my keys just aren't in yet.
+- **Code:** all merged to `main` in `btheis15/personal-garage-sale` (PRs #1–#3, including the
+  Bitcoin Cash wallet receipts and "Spread the word"). Nothing is waiting on a branch.
+- **Mac mini:** installed and running (sections 1–4 done). Server at
+  `~/Repos/personal-garage-sale/server`, launchd jobs `com.garagesale.{server,backup,duckdns}`,
+  `npm test` 29 pass / 0 fail, public at `https://brians-garage-sale.duckdns.org/health`.
+  Nightly backups go to iCloud Drive → `Garage Sale Backups` (first one ran Oct 8).
+- **Vercel:** connected to the mini. `SHOP_API_URL`, the three secrets and `ADMIN_PASSWORD` are set
+  (Production), and `/`, `/sell`, `/share`, `/share/terms` load; `/bcmr/…` reaches the mini.
+  Until Oct 8 the project's **Framework Preset was empty ("Other")**, so every build published
+  nothing and every page was a 404. It's now **Next.js**: if the site ever 404s everywhere again,
+  check that first (Settings → Build and Deployment).
+- **Next:** section 5 (first real test from the phone), then Stripe, Bitcoin Cash and emails
+  (section 6): code is ready, the keys just aren't in yet.
 
 ### How it fits together
 
@@ -35,10 +43,10 @@ website in the browser.
 
 ## Before starting: decide these
 
-- [ ] **DuckDNS name** for this project, e.g. `brian-garage-sale` → `brian-garage-sale.duckdns.org`.
-      Must be different from Om Threads' (`omthreads-shop`).
-- [ ] **Sell app password** (8+ characters) for `ADMIN_PASSWORD`.
-- [ ] **Backup folder**, e.g. `~/Library/Mobile Documents/com~apple~CloudDocs/Garage Sale Backups`.
+- [x] **DuckDNS name** for this project: `brians-garage-sale` → `brians-garage-sale.duckdns.org`.
+      Must be different from Om Threads' (`omthreadsboutique`).
+- [x] **Sell app password** (8+ characters) for `ADMIN_PASSWORD`.
+- [x] **Backup folder**, e.g. `~/Library/Mobile Documents/com~apple~CloudDocs/Garage Sale Backups`.
 - [ ] Optional: a **custom domain** for the site (otherwise `personal-garage-sale.vercel.app`).
 
 ---
@@ -70,14 +78,14 @@ Then edit `server/.env` (`open -e .env`) and set:
 
 Leave Stripe, BCH and SMTP blank for now (section 5).
 
-- [ ] Server cloned, `npm test` passes, `.env` made and filled in
+- [x] Server cloned, `npm test` passes, `.env` made and filled in
 
 ## 2. DuckDNS
 
 1. At **duckdns.org**, add the new subdomain (same account as Om Threads).
 2. On the **Mac mini**: `./scripts/duckdns-update.sh` → should print `<name>: OK`.
 
-- [ ] DuckDNS name points at home
+- [x] DuckDNS name points at home
 
 ## 3. Caddy (shares port 443 with Om Threads)
 
@@ -85,9 +93,11 @@ On the **Mac mini**:
 
 1. Add the block from `server/deploy/Caddyfile.snippet` to `/opt/homebrew/etc/Caddyfile`, with my
    DuckDNS name in place of `brian-garage-sale`. **Don't touch Om Threads' block.**
-2. `caddy validate --config /opt/homebrew/etc/Caddyfile && brew services restart caddy`
+2. `caddy validate --config /opt/homebrew/etc/Caddyfile && caddy reload --config /opt/homebrew/etc/Caddyfile`
+   (a graceful reload: the same Caddy also serves MLR media and Om Threads, and
+   `brew services restart caddy` would cut off anything they're in the middle of serving)
 
-- [ ] Caddy block added and Caddy restarted
+- [x] Caddy block added and Caddy reloaded
 
 ## 4. Start the server, and connect Vercel to it
 
@@ -113,8 +123,8 @@ the tokens **Sensitive**):
 Then **Deployments → Redeploy** the latest production deployment. (The site reads `SHOP_API_URL`
 at build time for the `/media` photo rewrite, so a redeploy is required.)
 
-- [ ] Server running under launchd, `/health` answers over HTTPS
-- [ ] Vercel variables added and redeployed
+- [x] Server running under launchd, `/health` answers over HTTPS
+- [x] Vercel variables added and redeployed
 
 ## 5. First real test (no payments yet)
 
