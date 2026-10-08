@@ -34,7 +34,7 @@ export function createNotifier({ config, store, makeTransport = (o) => nodemaile
     return a ? [a.line1, a.line2, [a.city, a.state, a.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") : "(see Stripe)";
   };
 
-  async function paid(o) {
+  async function paid(o, { skipBuyer = false } = {}) {
     const s = store.getSettings();
     const method = o.method ? PAY_METHOD_LABEL[o.method] : "";
     await send(
@@ -42,8 +42,8 @@ export function createNotifier({ config, store, makeTransport = (o) => nodemaile
       `Sold: ${o.items.map((i) => i.title).join(", ")} (${moneyText(o.totalCents)})`,
       `Order #${o.number} was paid${method ? ` (${method})` : ""}.\n\n${lines(o)}\n\nBuyer: ${who(o)}\n${o.fulfillment === "ship" ? `Ship to: ${address(o)}` : "Pickup"}\n${o.customer.note ? `Note: ${o.customer.note}\n` : ""}${sellLink(o)}`,
     );
-    // In-person cash sales have no email: nothing to send.
-    if (o.customer.email)
+    // In-person cash sales have no email; a buyer who chose only the CashToken receipt has it in their wallet.
+    if (o.customer.email && !skipBuyer)
       await send(
         o.customer.email,
         `Thanks for your order #${o.number} from ${s.name}`,
@@ -69,6 +69,6 @@ export function createNotifier({ config, store, makeTransport = (o) => nodemaile
       );
   }
 
-  const quietly = (fn) => (o) => fn(o).catch((e) => console.error(`[email] order ${o.number}: ${e.message}`));
+  const quietly = (fn) => (o, opts) => fn(o, opts).catch((e) => console.error(`[email] order ${o.number}: ${e.message}`));
   return { enabled, paid: quietly(paid), reserved: quietly(reserved) };
 }

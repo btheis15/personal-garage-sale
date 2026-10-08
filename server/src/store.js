@@ -6,10 +6,11 @@ import { randomUUID } from "node:crypto";
 import { CATEGORIES, CHANNELS, CONDITIONS, DEFAULT_SETTINGS, SOLD_SHOWN_DAYS, STATUSES, slugify } from "./site.js";
 
 export class ShopError extends Error {
-  constructor(message, { status = 400, itemIds = undefined } = {}) {
+  constructor(message, { status = 400, itemIds = undefined, errors = undefined } = {}) {
     super(message);
     this.status = status;
     this.itemIds = itemIds;
+    this.errors = errors;
   }
 }
 
@@ -71,6 +72,8 @@ export function toOrder(r) {
     fulfillment: r.fulfillment,
     customer: json(r.customer, {}),
     stripeSessionId: r.stripe_session_id,
+    partnerId: r.partner_id ?? null,
+    receiptPref: r.receipt_pref ?? null,
     holdUntil: r.hold_until,
     paidAt: r.paid_at,
     completedAt: r.completed_at,
@@ -96,10 +99,11 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
 
   function getSettings() {
     const row = db.prepare("select value from settings where key = 'site'").get();
-    return { ...DEFAULT_SETTINGS, ...json(row?.value, {}) };
+    const saved = json(row?.value, {});
+    return { ...DEFAULT_SETTINGS, ...saved, partners: { ...DEFAULT_SETTINGS.partners, ...(saved.partners ?? {}) } };
   }
 
-  const LIMITS = { name: 60, tagline: 140, about: 3000, pickupArea: 120, pickupInstructions: 2000, contactEmail: 120, contactPhone: 40, venmo: 60, announcement: 140 };
+  const LIMITS = { name: 60, tagline: 140, about: 3000, pickupArea: 120, pickupInstructions: 2000, contactEmail: 120, contactPhone: 40, venmo: 60, announcement: 140, receiptNote: 120 };
   function saveSettings(body = {}) {
     const next = getSettings();
     for (const [k, max] of Object.entries(LIMITS)) if (typeof body[k] === "string") next[k] = body[k].trim().slice(0, max);
@@ -115,6 +119,21 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       const c = Math.round(Number(body.defaultShippingCents));
       if (!(c >= 0 && c <= 100_000)) throw new ShopError("Shipping must be between $0 and $1,000.");
       next.defaultShippingCents = c;
+    }
+    if (body.partners && typeof body.partners === "object") {
+      const p = { ...next.partners };
+      if (typeof body.partners.enabled === "boolean") p.enabled = body.partners.enabled;
+      if (body.partners.ratePercent !== undefined) {
+        const r = Number(body.partners.ratePercent);
+        if (!(r >= 1 && r <= 50)) throw new ShopError("A commission rate is between 1% and 50%.");
+        p.ratePercent = Math.round(r * 10) / 10;
+      }
+      if (body.partners.taxFormOver !== undefined) {
+        const t = Math.round(Number(body.partners.taxFormOver));
+        if (!(t >= 100 && t <= 100_000)) throw new ShopError("The yearly limit for US partners is between $100 and $100,000.");
+        p.taxFormOver = t;
+      }
+      next.partners = p;
     }
     db.prepare("insert into settings (key, value) values ('site', ?) on conflict(key) do update set value = excluded.value").run(JSON.stringify(next));
     onChange();
@@ -312,7 +331,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     return ids;
   }
 
-  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents }) => {
+  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref }) => {
     const hold = holdMinutes === null || holdMinutes === undefined ? null : iso(now() + holdMinutes * 60_000);
     const snapshot = [];
     let subtotal = 0;
@@ -333,9 +352,9 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     const t = iso();
     const id = randomUUID();
     db.prepare(
-      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, created_at, updated_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, subtotal + ship, fulfillment, JSON.stringify(customer ?? {}), hold, t, t);
+      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, partner_id, receipt_pref, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, subtotal + ship, fulfillment, JSON.stringify(customer ?? {}), hold, partnerId ?? null, receiptPref ?? null, t, t);
     return id;
   });
 
@@ -343,11 +362,11 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
    * Creates an order and takes its items out of stock in one go, so two buyers can never get the
    * last one. lines: [{ id, qty }]. Gives back stale holds first.
    */
-  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0 }) {
+  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0, partnerId = null, receiptPref = null }) {
     const clean = (Array.isArray(lines) ? lines : []).filter((l) => isId(l?.id)).slice(0, 50);
     if (!clean.length) throw new ShopError("Your cart is empty.");
     expireStale();
-    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents });
+    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref });
     onChange();
     return getOrder(id);
   }

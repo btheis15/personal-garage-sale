@@ -49,7 +49,6 @@ import {
   sha256,
   stringify,
 } from "@bitauth/libauth";
-import { randomBytes } from "node:crypto";
 import { ElectrumClient } from "@electrum-cash/network";
 
 export const SATS = 100_000_000;
@@ -423,7 +422,7 @@ export function walletHoldings(utxos) {
  * `token.amount` of `token.category` to it too, with change back to the wallet. Pays 1 sat a byte.
  * (The shopper's payment to an order; the shop's rewards wallet sending tokens to a shopper.)
  */
-export function buildWalletPayment({ wallet, utxos, payTo, sats, token = null, userPrompt }) {
+export function buildWalletPayment({ wallet, utxos, payTo, sats, token = null, also = [], userPrompt }) {
   const from = hexToBin(wallet.lockingBytecode);
   const to = hexToBin(payTo);
   const spend = [];
@@ -442,6 +441,8 @@ export function buildWalletPayment({ wallet, utxos, payTo, sats, token = null, u
   const category = token ? hexToBin(token.category) : null;
   const outputs = [];
   if (sats > 0) outputs.push({ lockingBytecode: to, valueSatoshis: BigInt(sats) });
+  // Other payments in the same transaction (a sales partner's share, docs/commissions.md): { lockingBytecode, sats }.
+  for (const a of also) outputs.push({ lockingBytecode: hexToBin(a.lockingBytecode), valueSatoshis: BigInt(a.sats) });
   if (token && BigInt(token.amount) > 0n) {
     outputs.push({ lockingBytecode: to, valueSatoshis: BigInt(TOKEN_DUST), token: { amount: BigInt(token.amount), category } });
     if (tokenIn > BigInt(token.amount)) outputs.push({ lockingBytecode: from, valueSatoshis: BigInt(TOKEN_DUST), token: { amount: tokenIn - BigInt(token.amount), category } });
@@ -498,7 +499,8 @@ export function readSignedPayment(hex, lockingBytecode) {
 
 /** A new private key for the rewards wallet, as WIF (the form wallets import). */
 export function newWalletKey() {
-  const key = generatePrivateKey(() => randomBytes(32));
+  // Web Crypto: in Node 22+ and every browser.
+  const key = generatePrivateKey(() => globalThis.crypto.getRandomValues(new Uint8Array(32)));
   return encodePrivateKeyWif(key, "mainnet");
 }
 

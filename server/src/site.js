@@ -14,6 +14,10 @@ export const DEFAULT_SETTINGS = {
   shipping: false,
   defaultShippingCents: 1000,
   announcement: "",
+  // Bitcoin Cash receipts as CashTokens: offered at checkout once the collection is made (Settings).
+  receiptNote: "Thanks for stopping by!",
+  // "Spread the word": friends and neighbors share the sale and earn a commission on Bitcoin Cash sales.
+  partners: { enabled: false, ratePercent: 10, taxFormOver: 2000 },
 };
 
 export const CATEGORIES = ["furniture", "electronics", "home", "tools", "clothing", "kids", "sports", "media", "collectibles", "auto", "other"];
@@ -27,6 +31,11 @@ export const CHECKOUT_HOLD_MINUTES = 35;
 export const IN_PERSON_HOLD_MINUTES = 30;
 /** Sold items stay in the shop (as Sold) this long. */
 export const SOLD_SHOWN_DAYS = 14;
+
+/** Countries under comprehensive US embargoes (OFAC): no partners there. */
+export const EMBARGOED = { CU: "Cuba", IR: "Iran", KP: "North Korea", SY: "Syria" };
+/** The version of the "Spread the word" terms partners agree to (src/app/(shop)/share/terms on the website). */
+export const PARTNER_TERMS_VERSION = "2026-10";
 
 export const PAY_METHOD_LABEL = { stripe: "Card", bch: "Bitcoin Cash", cash: "Cash", venmo: "Venmo", other: "Other" };
 

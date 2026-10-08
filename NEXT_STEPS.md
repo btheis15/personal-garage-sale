@@ -53,7 +53,7 @@ git clone https://github.com/btheis15/personal-garage-sale.git
 cd personal-garage-sale/server
 node -v                                        # must be 22+ (see Om Threads' README for a separate Node 22 if not)
 npm ci
-npm test                                       # expect "# pass 21" and "# fail 0"
+npm test                                       # expect "# pass 29" and "# fail 0"
 lsof -nP -iTCP:8797 -sTCP:LISTEN               # must print nothing (port free)
 npm run setup-env                              # creates server/.env and PRINTS 3 secrets: save them for step 4
 ```
@@ -160,6 +160,15 @@ All of these go in the **Mac mini's** `server/.env`, then restart:
 - [ ] Optional, in **Vercel**: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` from dashboard.reown.com
       (add the site's domain there) for "Connect wallet". Redeploy.
 
+### Bitcoin Cash extras (optional, after BCH works)
+- [ ] Hot wallet: on the mini `cd server && npm run new-hot-wallet` → key into `BCH_HOT_WALLET_WIF`
+      in `.env`, restart, send its address ~0.001 BCH (docs/MAC_MINI.md → "Bitcoin Cash extras")
+- [ ] **Sell → Settings → Set up wallet receipts** (once), then pay a $0.25 item choosing
+      "Wallet receipt" and claim it into a CashToken wallet (Cashonize, Paytaca, Zapit)
+- [ ] Optional: **Spread the word** (Settings → Bitcoin Cash extras). Read `/share/terms` first;
+      sign up yourself at `/share` with a second wallet, buy through the link, and check the cut
+      arrives and shows on `/share/me` and in **See your friends**
+
 ### Order emails
 - [ ] `SMTP_USER=<my gmail>` and `SMTP_PASS=<Gmail app password>` (myaccount.google.com → App
       passwords). Optional `NOTIFY_EMAIL` (where "Sold!" emails go) and `MAIL_FROM`.
@@ -194,7 +203,7 @@ All of these go in the **Mac mini's** `server/.env`, then restart:
 |---|---|
 | Repo | `github.com/btheis15/personal-garage-sale` |
 | Website code | repo root (Next.js 16; read `node_modules/next/dist/docs/` before changing it, per `AGENTS.md`) |
-| Server code | `server/` (`npm test` there runs its 21 tests) |
+| Server code | `server/` (`npm test` there runs its 29 tests) |
 | Server settings | `server/.env` on the mini (never committed) |
 | Website settings | Vercel → personal-garage-sale → Environment Variables |
 | Logs | `~/Library/Logs/garage-sale/` on the mini |

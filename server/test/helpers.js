@@ -5,22 +5,26 @@ import sharp from "sharp";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { openDb } from "../src/db.js";
+import { createSanctionsList } from "../src/bch.js";
+import { createPartners } from "../src/partners.js";
 import { createStore } from "../src/store.js";
 
 export const SITE = "s".repeat(40);
 export const ADMIN = "a".repeat(40);
 
 /** A whole server on a free port, with stand-ins for Stripe, Bitcoin Cash and email. */
-export async function startServer({ stripe = fakeStripe(), bch = { enabled: false } } = {}) {
+export async function startServer({ stripe = fakeStripe(), bch = { enabled: false }, sanctionsFetch = null } = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "gs-test-"));
   const config = loadConfig({ dataDir: dir, siteToken: SITE, adminToken: ADMIN, siteUrl: "https://shop.test" });
   const db = openDb(":memory:");
   const sent = [];
-  const notifier = { enabled: true, paid: (o) => sent.push(["paid", o.number]), reserved: (o) => sent.push(["reserved", o.number]) };
+  const notifier = { enabled: true, paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]) };
   const store = createStore(db);
   const s = typeof stripe === "function" ? stripe(store) : stripe;
-  const b = typeof bch === "function" ? bch(store, db) : bch;
-  const app = createApp({ config, store, stripe: s, bch: b, notifier, revalidator: { status: () => ({ state: "idle" }) } });
+  const sanctions = createSanctionsList(db, sanctionsFetch ? { fetchImpl: sanctionsFetch } : {});
+  const partners = createPartners({ db, store, config, isBlocked: sanctions.isBlocked });
+  const b = typeof bch === "function" ? bch(store, db, { partners, sanctions, notifier }) : bch;
+  const app = createApp({ config, store, stripe: s, bch: b, notifier, partners, sanctions, revalidator: { status: () => ({ state: "idle" }) } });
   const server = await new Promise((resolve) => {
     const srv = app.listen(0, "127.0.0.1", () => resolve(srv));
   });
@@ -36,7 +40,10 @@ export async function startServer({ stripe = fakeStripe(), bch = { enabled: fals
   return {
     base,
     store,
+    db,
     sent,
+    partners,
+    sanctions,
     config,
     site: call(SITE),
     admin: call(ADMIN),

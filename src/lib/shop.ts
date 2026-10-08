@@ -20,6 +20,8 @@ export class ShopApiError extends Error {
     message: string,
     public status: number,
     public itemIds?: string[],
+    /** Which form fields are wrong (the "Spread the word" sign-up). */
+    public errors?: Record<string, string>,
   ) {
     super(message);
   }
@@ -49,8 +51,8 @@ export async function shopApi<T = Record<string, unknown>>(path: string, { metho
   } catch {
     throw new ShopApiError("Can't reach the shop's server right now. Please try again in a minute.", 503);
   }
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string; itemIds?: string[] };
-  if (!res.ok) throw new ShopApiError(data.error ?? `The shop's server answered ${res.status}.`, res.status, data.itemIds);
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string; itemIds?: string[]; errors?: Record<string, string> };
+  if (!res.ok) throw new ShopApiError(data.error ?? `The shop's server answered ${res.status}.`, res.status, data.itemIds, data.errors);
   return data;
 }
 

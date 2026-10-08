@@ -1,6 +1,6 @@
 # bch-engine
 
-The Bitcoin Cash payment engine from
+The Bitcoin Cash payment engine (kit version 0.2+, with commissions and sanctions screening) from
 [bch_cashtoken_checkout](https://github.com/btheis15/bch_cashtoken_checkout) (`src/`), copied as is.
 The website's payment screen (`src/components/bch/` at the repo root) is that repo's `examples/react/`.
 

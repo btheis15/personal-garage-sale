@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { SiteSettings } from "@/lib/types";
 import { Bunting, HouseLine, SunRings } from "./ornaments";
 
-export function Footer({ settings }: { settings: SiteSettings }) {
+export function Footer({ settings, sharing = false }: { settings: SiteSettings; sharing?: boolean }) {
   return (
     <footer className="relative isolate mt-24 overflow-hidden bg-tag-dark pt-4 text-paper">
       <Bunting className="relative mx-auto max-w-6xl px-2 text-paper/30" flags={18} />
@@ -31,6 +31,13 @@ export function Footer({ settings }: { settings: SiteSettings }) {
                 Pickup, payment & questions
               </Link>
             </p>
+            {sharing && (
+              <p>
+                <Link href="/share" className="hover:text-amber-light">
+                  Spread the word (earn a cut)
+                </Link>
+              </p>
+            )}
           </div>
           <div className="space-y-2" data-reveal style={{ "--i": 1 } as React.CSSProperties}>
             <p className="eyebrow text-amber-light">Pickup</p>

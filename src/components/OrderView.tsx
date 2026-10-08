@@ -8,6 +8,7 @@ import type { BuyerOrder } from "@/lib/types";
 import { money, PAY_METHOD_LABEL } from "@/lib/site";
 import type { BchApi } from "./bch/api";
 import { BchPay } from "./bch/BchPay";
+import { ReceiptToken } from "./bch/ReceiptToken";
 import type { BchView } from "./bch/types";
 import { createBchWalletConnect } from "./bch/walletConnect";
 import { cart } from "./cart/store";
@@ -33,9 +34,24 @@ function bchApi(orderId: string): BchApi {
     build: (input) => call("/build", input),
     submit: (hex) => call("/submit", { hex }),
     claim: none,
-    receipt: none,
+    receipt: (address) => call("/receipt", { address }),
   };
 }
+
+/** The payment screen and wallet receipt in the garage sale's colors. */
+const BCH_LOOK = {
+  "--bchpay-bg": "#ffffff",
+  "--bchpay-soft": "#efece5",
+  "--bchpay-line": "#e2ded5",
+  "--bchpay-ink": "#22272e",
+  "--bchpay-muted": "#646b73",
+  "--bchpay-accent": "#2b4c6f",
+  "--bchpay-accent-light": "#e7eef5",
+  "--bchpay-accent-2": "#3d7a4f",
+  "--bchpay-ok": "#3d7a4f",
+  "--bchpay-font": "var(--font-sans)",
+  "--bchpay-font-display": "var(--font-display)",
+} as React.CSSProperties;
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -148,6 +164,13 @@ export function OrderView({
         </div>
       )}
 
+      {/* Paid with Bitcoin Cash and asked for a wallet receipt: it stays here to claim (or to look at) when they come back. */}
+      {paid && order.method === "bch" && bchView && (bchView.receipt || bchView.receiptPref !== "email") && (
+        <div className="bchpay mt-6" style={BCH_LOOK}>
+          <ReceiptToken api={api} initial={bchView.receipt ?? null} expected={bchView.receiptPref !== "email"} brand={{ name: shop.name, logo: "/icon.png", contactUrl: "/about" }} wc={wc} />
+        </div>
+      )}
+
       {order.status === "pending" && order.method === "bch" && bchView && (
         <div className="mt-6">
           <BchPay
@@ -162,21 +185,7 @@ export function OrderView({
                 router.refresh();
               }, 2500);
             }}
-            style={
-              {
-                "--bchpay-bg": "#ffffff",
-                "--bchpay-soft": "#efece5",
-                "--bchpay-line": "#e2ded5",
-                "--bchpay-ink": "#22272e",
-                "--bchpay-muted": "#646b73",
-                "--bchpay-accent": "#2b4c6f",
-                "--bchpay-accent-light": "#e7eef5",
-                "--bchpay-accent-2": "#3d7a4f",
-                "--bchpay-ok": "#3d7a4f",
-                "--bchpay-font": "var(--font-sans)",
-                "--bchpay-font-display": "var(--font-display)",
-              } as React.CSSProperties
-            }
+            style={BCH_LOOK}
           />
         </div>
       )}

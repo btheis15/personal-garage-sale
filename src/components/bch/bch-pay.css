@@ -818,6 +818,9 @@
   transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
   animation: bchpay-up 0.5s cubic-bezier(0.2, 1, 0.3, 1) both;
 }
+.bchpay-sheet-wrap.closing {
+  pointer-events: none;
+}
 .bchpay-sheet-wrap.closing .bchpay-sheet {
   animation: bchpay-down 0.26s cubic-bezier(0.4, 0, 1, 1) both;
 }
@@ -1377,6 +1380,7 @@
 /* The receipt, printed: paper with a torn edge, rolling out of the printer. */
 .bchpay-receipt-paper {
   position: relative;
+  overflow-wrap: anywhere;
   margin: 0.25rem auto 0.9rem;
   max-width: 26rem;
   background:
@@ -1398,8 +1402,13 @@
 }
 .bchpay-receipt-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+/* A long shop name keeps its line; the collection's chip moves below it on a phone. */
+.bchpay-receipt-head > .bchpay-grow {
+  min-width: 9rem;
 }
 .bchpay-receipt-head-mark {
   display: grid;

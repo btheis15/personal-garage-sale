@@ -77,7 +77,15 @@ export type BuyerOrder = {
 };
 
 /** Which ways to pay the Mac mini has switched on. */
-export type Payments = { stripe: boolean; stripeTest: boolean; bch: boolean };
+export type Payments = {
+  stripe: boolean;
+  stripeTest: boolean;
+  bch: boolean;
+  /** Bitcoin Cash buyers can take their receipt as a CashToken (the collection is made in Settings). */
+  bchReceipts?: boolean;
+  /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
+  partners?: { ratePercent: number } | null;
+};
 
 export type Customer = {
   name?: string;
@@ -129,4 +137,8 @@ export type SiteSettings = {
   defaultShippingCents: number;
   /** A line across the top of the shop, e.g. "Garage sale Saturday 8–2!" (blank: none). */
   announcement: string;
+  /** A line printed on Bitcoin Cash receipts (CashTokens). */
+  receiptNote?: string;
+  /** "Spread the word": friends share the sale and earn a commission on Bitcoin Cash sales. */
+  partners?: { enabled: boolean; ratePercent: number; taxFormOver: number };
 };

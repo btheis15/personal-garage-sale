@@ -11,6 +11,8 @@ type Status = {
   stripeWebhook: boolean;
   bch: boolean;
   bchFirstAddress: string | null;
+  hotWallet: boolean;
+  receipts: boolean;
   email: boolean;
   publicUrl: string | null;
   website: { state: string; message: string };
@@ -32,6 +34,8 @@ export default async function SettingsPage() {
         stripeWebhook: Boolean(status?.stripeWebhook),
         bch: Boolean(status?.bch),
         bchFirstAddress: status?.bchFirstAddress ?? null,
+        hotWallet: Boolean(status?.hotWallet),
+        receipts: Boolean(status?.receipts),
         walletConnect: Boolean(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID),
         email: Boolean(status?.email),
         publicUrl: status?.publicUrl ?? null,

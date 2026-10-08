@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { SiteSettings } from "@/lib/types";
 import { dollars, sellApi, toCents } from "./api";
+import { ReceiptsSetup } from "./ReceiptsSetup";
 
 type Setup = {
   server: boolean;
@@ -10,6 +12,8 @@ type Setup = {
   stripeWebhook: boolean;
   bch: boolean;
   bchFirstAddress: string | null;
+  hotWallet: boolean;
+  receipts: boolean;
   walletConnect: boolean;
   email: boolean;
   publicUrl: string | null;
@@ -17,8 +21,12 @@ type Setup = {
   siteUrl: string;
 };
 
+const PARTNER_DEFAULTS = { enabled: false, ratePercent: 10, taxFormOver: 2000 };
+
 export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup: Setup }) {
   const [s, setS] = useState(initial);
+  const partners = s.partners ?? PARTNER_DEFAULTS;
+  const setPartners = (p: Partial<typeof partners>) => setS((x) => ({ ...x, partners: { ...(x.partners ?? PARTNER_DEFAULTS), ...p } }));
   const [shipping, setShipping] = useState(dollars(initial.defaultShippingCents));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -49,6 +57,7 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
     { ok: Boolean(setup.stripe), label: setup.stripe ? `Stripe: ${setup.stripe === "test" ? "test mode (no real money)" : "live"}` : "Card payments (Stripe)", hint: "STRIPE_SECRET_KEY from your personal Stripe account, in the mini's .env." },
     { ok: setup.stripeWebhook, label: "Stripe's payment notices", hint: `Stripe → Developers → Webhooks → ${setup.publicUrl ?? "<the mini's PUBLIC_URL>"}/stripe/webhook, then STRIPE_WEBHOOK_SECRET in the mini's .env.` },
     { ok: setup.bch, label: setup.bchFirstAddress ? `Bitcoin Cash: first address …${setup.bchFirstAddress.slice(-8)} (check it matches your wallet)` : "Bitcoin Cash", hint: "BCH_XPUB (your wallet's xPub, which can't spend) in the mini's .env." },
+    { ok: setup.hotWallet, label: "BCH hot wallet (optional)", hint: "For wallet receipts and Spread the word payouts: npm run new-hot-wallet on the mini, BCH_HOT_WALLET_WIF in its .env, then send it about 0.001 BCH." },
     { ok: setup.walletConnect, label: "BCH “Connect wallet” (optional)", hint: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in Vercel, from dashboard.reown.com." },
     { ok: setup.email, label: "Order emails (optional)", hint: "SMTP_USER and SMTP_PASS (a Gmail app password) in the mini's .env." },
   ];
@@ -110,11 +119,49 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
           )}
         </div>
 
+        {setup.bch && (
+          <div className="space-y-3 rounded-2xl border border-line bg-white p-4">
+            <p className="font-bold">Bitcoin Cash extras</p>
+            <Field label="Line printed on wallet receipts">
+              <input value={s.receiptNote ?? ""} onChange={text("receiptNote")} placeholder="Thanks for stopping by!" className="field" maxLength={120} />
+            </Field>
+            <label className="flex items-center justify-between gap-3 font-bold">
+              <span>
+                Spread the word
+                <span className="block text-sm font-normal text-muted">Friends share your sale and earn a cut of Bitcoin Cash sales through their link, paid from the hot wallet.</span>
+              </span>
+              <input type="checkbox" checked={partners.enabled} onChange={(e) => setPartners({ enabled: e.target.checked })} className="size-5 shrink-0 accent-tag" />
+            </label>
+            {partners.enabled && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Their cut (%)">
+                    <input inputMode="numeric" value={String(partners.ratePercent)} onChange={(e) => setPartners({ ratePercent: Number(e.target.value.replace(/\D/g, "")) || 0 })} className="field" />
+                  </Field>
+                  <Field label="1099-NEC amount ($)">
+                    <input inputMode="numeric" value={String(partners.taxFormOver)} onChange={(e) => setPartners({ taxFormOver: Number(e.target.value.replace(/\D/g, "")) || 0 })} className="field" />
+                  </Field>
+                </div>
+                <p className="text-sm text-muted">
+                  A friend in the US earns at most ${Math.max(0, partners.taxFormOver - 1).toLocaleString("en-US")} a year from you, so there&apos;s no 1099 to file. Sign-ups are at{" "}
+                  <span className="font-bold">/share</span>.
+                </p>
+                {!setup.hotWallet && <p className="rounded-xl bg-sun p-3 text-sm">Needs the hot wallet (see Setup below) to pay friends their cut.</p>}
+                <Link href="/sell/partners" className="btn btn-outline w-full">
+                  See your friends and what they&apos;ve earned →
+                </Link>
+              </>
+            )}
+          </div>
+        )}
+
         {msg && <p className={`rounded-xl p-3 text-sm font-bold ${msg.ok ? "bg-leaf-light text-leaf" : "bg-berry/10 text-berry"}`}>{msg.text}</p>}
         <button type="submit" className="btn btn-primary w-full" disabled={busy || !setup.server}>
           {busy ? "Saving…" : "Save"}
         </button>
       </form>
+
+      {setup.bch && <ReceiptsSetup hotWallet={setup.hotWallet} />}
 
       <section className="mt-10">
         <h2 className="text-xl">Setup</h2>

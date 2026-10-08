@@ -16,6 +16,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   shipping: false,
   defaultShippingCents: 1000,
   announcement: "",
+  receiptNote: "Thanks for stopping by!",
+  partners: { enabled: false, ratePercent: 10, taxFormOver: 2000 },
 };
 
 export const CATEGORIES = [

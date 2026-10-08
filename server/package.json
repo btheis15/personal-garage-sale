@@ -13,7 +13,8 @@
     "dev": "node --watch src/server.js",
     "test": "node --test test/*.test.js",
     "setup-env": "node scripts/setup-env.js",
-    "backup": "node scripts/backup.js"
+    "backup": "node scripts/backup.js",
+    "new-hot-wallet": "node scripts/new-hot-wallet.js"
   },
   "dependencies": {
     "@bitauth/libauth": "3.0.0",
