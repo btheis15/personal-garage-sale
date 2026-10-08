@@ -15,6 +15,8 @@ export default async function CheckoutPage(props: PageProps<"/checkout">) {
         stripe: Boolean(payments?.stripe),
         stripeTest: Boolean(payments?.stripeTest),
         bch: Boolean(payments?.bch),
+        bchReceipts: Boolean(payments?.bch && payments?.bchReceipts),
+        shopName: s?.name ?? "Garage Sale",
         payAtPickup: s?.payAtPickup ?? false,
         payAtPickupHours: s?.payAtPickupHours ?? 48,
         venmo: s?.venmo ?? "",

@@ -5,11 +5,12 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { RevealObserver } from "@/components/motion/RevealObserver";
 import { availability } from "@/lib/availability";
-import { getCatalog, getSettings, isSample } from "@/lib/shop";
+import { PartnerRef } from "@/components/share/PartnerRef";
+import { getCatalog, getPayments, getSettings, isSample } from "@/lib/shop";
 import { CATEGORIES } from "@/lib/site";
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
-  const [settings, items] = await Promise.all([getSettings(), getCatalog()]);
+  const [settings, items, payments] = await Promise.all([getSettings(), getCatalog(), getPayments()]);
   const forSale = items.filter((i) => availability(i) !== "sold");
   const categories = CATEGORIES.map((c) => ({ value: c.value, label: c.label, count: forSale.filter((i) => i.category === c.value).length })).filter((c) => c.count);
   return (
@@ -23,9 +24,10 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <ViewTransition default="none" update="page">
         <main id="main">{children}</main>
       </ViewTransition>
-      <Footer settings={settings} />
+      <Footer settings={settings} sharing={Boolean(payments.partners)} />
       <CartDrawer />
       <RevealObserver />
+      <PartnerRef />
       <Analytics />
     </>
   );

@@ -1,9 +1,11 @@
 "use client";
 
+import "./bch/bch-pay.css";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { money } from "@/lib/site";
+import { ReceiptChoice } from "./bch/ReceiptToken";
 import { cart, useCart } from "./cart/store";
 import { CheckIcon } from "./icons";
 import { ItemPhoto } from "./ItemPhoto";
@@ -13,6 +15,9 @@ type Options = {
   stripe: boolean;
   stripeTest: boolean;
   bch: boolean;
+  /** Bitcoin Cash buyers can take their receipt as a CashToken. */
+  bchReceipts: boolean;
+  shopName: string;
   payAtPickup: boolean;
   payAtPickupHours: number;
   venmo: string;
@@ -30,6 +35,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "", note: "" });
   const [fulfillment, setFulfillment] = useState<"pickup" | "ship">("pickup");
   const [method, setMethod] = useState<Method | null>(null);
+  const [receipt, setReceipt] = useState<"email" | "token" | "both">("email");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +83,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines: items.map((i) => ({ id: i.id, qty: i.qty })), customer, fulfillment: ship ? "ship" : "pickup", method: chosen }),
+        body: JSON.stringify({ lines: items.map((i) => ({ id: i.id, qty: i.qty })), customer, fulfillment: ship ? "ship" : "pickup", method: chosen, ...(chosen === "bch" && options.bchReceipts ? { receipt } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -144,6 +150,13 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
               {methods.map((m) => (
                 <Choice key={m.value} active={chosen === m.value} onClick={() => setMethod(m.value)} label={m.label} hint={m.hint} />
               ))}
+              {chosen === "bch" && options.bchReceipts && (
+                <div className="animate-rise rounded-lg border border-line bg-white p-4">
+                  <p className="font-bold">Your receipt</p>
+                  <p className="mb-3 text-sm text-muted">By email, or as a {options.shopName} Receipt: a little token kept in your Bitcoin Cash wallet.</p>
+                  <ReceiptChoice value={receipt} onChange={setReceipt} tokenName="Wallet receipt" />
+                </div>
+              )}
             </div>
           ) : (
             <p className="rounded-xl bg-kraft p-4">Online payment isn&apos;t set up yet. Please get in touch to buy something.</p>

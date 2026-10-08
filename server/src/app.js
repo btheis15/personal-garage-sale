@@ -47,7 +47,7 @@ function readCustomer(v) {
 }
 const readLines = (v) => (Array.isArray(v) ? v : []).slice(0, 50).map((l) => ({ id: str(l?.id, 40), qty: Number(l?.qty) || 1 }));
 
-export function createApp({ config, store, stripe, bch, notifier, revalidator }) {
+export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null }) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
@@ -69,7 +69,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
       res.set("Cache-Control", "no-store").json(await fn(req, res));
     } catch (e) {
       if (e instanceof ShopError || e instanceof MediaError || (e?.status >= 400 && e.status < 500) || e?.name === "BchError")
-        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}) });
+        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}), ...(e.errors ? { errors: e.errors } : {}) });
       next(e);
     }
   };
@@ -83,6 +83,15 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
   // Photos never change once written (a new photo gets a new id), so they're cached for a year.
   app.use("/media", express.static(config.mediaDir, { immutable: true, maxAge: "365d", index: false, dotfiles: "deny" }));
 
+  // What wallets show for a receipt as a CashToken (the website serves it at its own /bcmr/… too).
+  app.get("/bcmr/:file", send(async (req, res) => {
+    const m = /^([0-9a-f]{64})\.json$/.exec(req.params.file);
+    const json = m && bch.enabled ? await bch.registry(m[1]) : null;
+    if (!json) fail("Not found.", 404);
+    res.set({ "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300" });
+    return JSON.parse(json);
+  }));
+
   app.post("/stripe/webhook", express.raw({ type: "application/json", limit: "1mb" }), send((req) => stripe.webhook(req.body, req.get("stripe-signature"))));
 
   // --- The website -------------------------------------------------------------------------
@@ -90,7 +99,14 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
   const web = express.Router();
   web.use(site, express.json({ limit: "64kb" }));
 
-  const payments = () => ({ stripe: stripe.enabled, stripeTest: stripe.enabled && stripe.testMode, bch: bch.enabled });
+  const payments = () => ({
+    stripe: stripe.enabled,
+    stripeTest: stripe.enabled && stripe.testMode,
+    bch: bch.enabled,
+    // Receipts as CashTokens are offered with Bitcoin Cash; "Spread the word" is open.
+    bchReceipts: (bch.receiptsOn?.() ?? false),
+    partners: (bch.partnersOn?.() ?? false) ? { ratePercent: store.getSettings().partners.ratePercent } : null,
+  });
 
   web.get("/catalog", send(() => ({ items: store.catalog(), settings: store.getSettings(), payments: payments() })));
   web.get("/item/:slug", send((req) => ({ item: store.itemBySlug(req.params.slug) })));
@@ -124,7 +140,10 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
       }
       if (b.method === "bch") {
         if (!bch.enabled) fail("Bitcoin Cash isn't available right now.");
-        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES });
+        // Came through a partner's link (?s=<code>): their commission is paid with this Bitcoin Cash sale.
+        const partner = (bch.partnersOn?.() ?? false) && partners ? partners.forCode(str(b.partner, 40)) : null;
+        const receiptPref = ["email", "token", "both"].includes(b.receipt) ? b.receipt : "email";
+        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES, partnerId: partner?.id ?? null, receiptPref });
         return { url: `/order/${order.id}` };
       }
       fail("Pick how you'd like to pay.");
@@ -202,10 +221,23 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
         return bch.walletBuild(order.id, { address: s("address"), category: s("category"), amount: s("amount") });
       case "submit":
         return bch.walletSubmit(order.id, s("hex"));
+      case "receipt":
+        return bch.claimReceipt(order.id, s("address"));
       default:
         fail("Not found.", 404);
     }
   }));
+
+  // "Spread the word": sign-up and the partner's own page (their key stays in the page's # part, never a URL).
+  if (partners) {
+    web.post("/partners/signup", limit(5), send((req) => {
+      if (!(bch.partnersOn?.() ?? false)) fail("Spread the word isn't open right now.", 503);
+      return partners.signUp(req.body ?? {});
+    }));
+    web.post("/partners/me", limit(30), send((req) => partners.myPage(str(req.body?.key, 100))));
+    web.post("/partners/me/address", limit(10), send((req) => partners.setAddress(str(req.body?.key, 100), str(req.body?.address, 120))));
+    web.post("/partners/me/email", limit(10), send((req) => partners.setEmail(str(req.body?.key, 100), str(req.body?.email, 120))));
+  }
 
   // --- The Sell app ---------------------------------------------------------------------------
 
@@ -244,7 +276,13 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
   sell.get("/orders/:id", send(async (req) => {
     const order = mustOrder(req.params.id);
     const p = order.method === "bch" && bch.enabled ? await bch.payment(order.id).catch(() => null) : null;
-    return { order, bch: p ? { address: p.address, events: p.events ?? [], problems: p.problems ?? [] } : null };
+    const commission = p?.partner ? await bch.commission(order.id).catch(() => null) : null;
+    const partner = order.partnerId && partners ? partners.byId(order.partnerId) : null;
+    return {
+      order,
+      bch: p ? { address: p.address, events: p.events ?? [], problems: p.problems ?? [], receipt: p.receipt ? { state: p.receipt.state ?? null, to: p.receipt.to ?? null } : null } : null,
+      commission: commission ? { ...commission, partnerName: partner?.name ?? null, partnerCode: partner?.code ?? null } : null,
+    };
   }));
   sell.patch("/orders/:id", express.json({ limit: "16kb" }), send(async (req) => {
     const order = mustOrder(req.params.id);
@@ -285,14 +323,36 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator })
     return { order: paid };
   }));
 
+  // Receipts as CashTokens: the collection is made once, from the hot wallet.
+  sell.get("/receipts", send(async () => ({ receipts: await bch.receiptsStatus?.() ?? null, hotWallet: bch.enabled ? await bch.hotWalletStatus() : null })));
+  sell.post("/receipts", express.json({ limit: "8kb" }), send(async (req) => {
+    if (!bch.enabled) fail("Set BCH_XPUB first.", 409);
+    return { receipts: await bch.createReceipts(req.body ?? {}) };
+  }));
+
+  // "Spread the word": who's sharing the sale, what they've earned; pause one or give them their own rate.
+  sell.get("/partners", send(() => ({ partners: partners ? partners.list() : [], on: (bch.partnersOn?.() ?? false), hotWallet: Boolean(bch.hotWallet), sanctions: sanctions?.status() ?? null })));
+  sell.get("/partners/:id", send((req) => ({ commissions: partners ? partners.commissionsFor(req.params.id) : [] })));
+  sell.patch("/partners/:id", express.json({ limit: "8kb" }), send((req) => {
+    if (!partners) fail("Not found.", 404);
+    return { partner: partners.update(req.params.id, req.body ?? {}) };
+  }));
+
   sell.get("/settings", send(() => ({ settings: store.getSettings() })));
-  sell.put("/settings", express.json({ limit: "32kb" }), send((req) => ({ settings: store.saveSettings(req.body ?? {}) })));
+  sell.put("/settings", express.json({ limit: "32kb" }), send(async (req) => {
+    const settings = store.saveSettings(req.body ?? {});
+    await bch.syncReceiptLook?.().catch((e) => console.error("[bch] receipt look:", e.message));
+    return { settings };
+  }));
   sell.get("/status", send(() => ({
     server: true,
     stripe: stripe.enabled ? (stripe.testMode ? "test" : "live") : null,
     stripeWebhook: Boolean(config.stripeWebhookSecret),
     bch: bch.enabled,
     bchFirstAddress: bch.enabled ? bch.firstAddress() : null,
+    hotWallet: bch.enabled ? Boolean(bch.hotWallet) : false,
+    receipts: bch.enabled ? (bch.receiptsOn?.() ?? false) : false,
+    partners: bch.enabled ? (bch.partnersOn?.() ?? false) : false,
     email: notifier.enabled,
     publicUrl: config.publicUrl || null,
     website: revalidator.status(),

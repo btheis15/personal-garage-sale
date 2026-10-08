@@ -120,6 +120,26 @@ All in `server/.env`, then `launchctl kickstart -k gui/$(id -u)/com.garagesale.s
 3. Try a $0.25 item (BCH has no test network).
 4. Optional: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` in Vercel for "Connect wallet".
 
+**Bitcoin Cash extras (optional): wallet receipts and "Spread the word"**
+
+Both need a small **hot wallet** on the mini: a separate key that can spend, holding only pocket
+change. It makes the receipts (CashTokens) and pays friends their cut.
+1. `cd server && npm run new-hot-wallet` → prints a key and its address. Put the key in `.env` as
+   `BCH_HOT_WALLET_WIF` (never share it), restart.
+2. Send the printed address about **0.001 BCH** (a few hundred receipts). Sell → Settings → Wallet
+   receipts shows its balance and warns when it runs low. Commissions come out of it too, so top it
+   up to cover friends' cuts if you turn that on.
+3. **Wallet receipts**: Sell → Settings → **Set up wallet receipts** (once). From then on, Bitcoin
+   Cash buyers choose email, wallet receipt, or both at checkout. Wallets read the receipt's name and
+   picture from `<site>/bcmr/…` (passed to the mini by the website's rewrite).
+4. **Spread the word**: Sell → Settings → Bitcoin Cash extras → turn it on, set the cut (10% by
+   default). Friends sign up at `<site>/share` and get a link; Bitcoin Cash sales through it (within 30
+   days) pay them their cut as the buyer pays. US friends stop earning at $1 under the 1099-NEC amount
+   each year, payout addresses are checked against the US sanctions list (refreshed hourly), and
+   embargoed countries can't sign up. Sell → Settings → **See your friends** shows each one; pause or
+   remove them, or give one their own rate. If you change the terms (`src/components/share/ShareTerms.tsx`),
+   bump `TERMS_VERSION` there and `PARTNER_TERMS_VERSION` in `server/src/site.js`.
+
 **Emails**: `SMTP_USER` (your Gmail) and `SMTP_PASS` (a Gmail app password:
 myaccount.google.com → App passwords). You get "Sold!" emails; buyers get a receipt with pickup details.
 

@@ -10,9 +10,31 @@ import { ItemPhoto } from "../ItemPhoto";
 import { sellApi } from "./api";
 import { ago, STATUS_LABEL } from "./OrderList";
 
-type BchInfo = { address: string; events: { at: string; kind: string; message: string }[]; problems: { kind: string; message: string }[] };
+export type BchInfo = {
+  address: string;
+  events: { at: string; kind: string; message: string }[];
+  problems: { kind: string; message: string }[];
+  /** The buyer's receipt as a CashToken, if they asked for one. */
+  receipt?: { state: string | null; to: string | null } | null;
+};
+/** A friend's "Spread the word" cut of this sale. */
+export type CommissionInfo = {
+  partnerName: string | null;
+  partnerCode: string | null;
+  ratePercent: number;
+  cents: number;
+  yourCents: number;
+  state: "pending" | "sent" | "cancelled";
+  how: "split" | "wallet" | null;
+  waiting: string | null;
+  note: string | null;
+  txUrl: string | null;
+};
 
-export function OrderDetail({ order: initial, photos, bch }: { order: Order; photos: Record<string, string | null>; bch: BchInfo | null }) {
+const RECEIPT_STATE: Record<string, string> = { claimable: "Waiting for the buyer to claim it", sending: "On its way to their wallet", sent: "In their wallet", pending: "Being made" };
+const CUT_STATE: Record<CommissionInfo["state"], string> = { pending: "on its way", sent: "paid", cancelled: "cancelled" };
+
+export function OrderDetail({ order: initial, photos, bch, commission = null }: { order: Order; photos: Record<string, string | null>; bch: BchInfo | null; commission?: CommissionInfo | null }) {
   const router = useRouter();
   const [order, setOrder] = useState(initial);
   const [notes, setNotes] = useState(initial.notes);
@@ -93,6 +115,25 @@ export function OrderDetail({ order: initial, photos, bch }: { order: Order; pho
         {a && <Row k="Ship to" v={[a.line1, a.line2, [a.city, a.state, a.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ")} />}
         {c.note && <Row k="Their note" v={c.note} />}
         {bch && <Row k="BCH address" v={<span className="break-all">{bch.address}</span>} />}
+        {bch?.receipt?.state && <Row k="Wallet receipt" v={RECEIPT_STATE[bch.receipt.state] ?? bch.receipt.state} />}
+        {commission && (
+          <Row
+            k="Spread the word"
+            v={
+              <span>
+                {commission.partnerName ?? "A friend"}&apos;s {commission.ratePercent}% cut: <b>{money(commission.cents)}</b> ({CUT_STATE[commission.state]}
+                {commission.state === "sent" && commission.how === "split" ? ", inside the buyer's payment" : ""}). You keep {money(commission.yourCents)}.
+                {commission.waiting && <span className="block text-muted">{commission.waiting}</span>}
+                {commission.note && <span className="block text-muted">{commission.note}</span>}
+                {commission.txUrl && (
+                  <a href={commission.txUrl} target="_blank" rel="noopener noreferrer" className="block font-bold text-tag-dark underline">
+                    See the payment ↗
+                  </a>
+                )}
+              </span>
+            }
+          />
+        )}
       </dl>
 
       {error && <p className="mt-4 rounded-xl bg-berry/10 p-3 text-sm font-bold text-berry">{error}</p>}

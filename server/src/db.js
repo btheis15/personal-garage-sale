@@ -91,7 +91,56 @@ create table if not exists bch_meta (
   name text primary key,
   value text not null
 );
+
+-- "Spread the word": people who share the sale for a commission on Bitcoin Cash sales (src/partners.js).
+create table if not exists partners (
+  id text primary key,
+  code text not null unique,
+  name text not null,
+  address text not null,
+  email text,
+  key_hash text not null,
+  country text not null,
+  us_person integer not null,
+  mailing_address text not null,
+  terms_version text not null,
+  terms_accepted_at text not null,
+  -- active · paused (their link stops earning) · removed
+  status text not null default 'active',
+  -- Their own rate; null: the shop's (Settings).
+  rate_percent real,
+  created_at text not null,
+  updated_at text not null
+);
+create index if not exists partners_key_idx on partners (key_hash);
+
+-- One per order through a partner's link, once it's paid.
+create table if not exists commissions (
+  order_id text primary key,
+  partner_id text not null,
+  order_number integer not null,
+  rate_percent real,
+  base_cents integer,
+  cents integer,
+  -- pending · sent · cancelled
+  state text not null,
+  -- split (in the buyer's own payment) · wallet (from the hot wallet)
+  how text,
+  sats integer,
+  txid text,
+  note text,
+  created_at text not null,
+  updated_at text not null,
+  sent_at text
+);
+create index if not exists commissions_partner_idx on commissions (partner_id, created_at);
 `;
+
+// Columns added after the first version (SQLite has no "add column if not exists").
+const LATER_COLUMNS = [
+  ["orders", "partner_id", "text"],
+  ["orders", "receipt_pref", "text"],
+];
 
 export function openDb(file = ":memory:") {
   const db = new Database(file);
@@ -99,5 +148,9 @@ export function openDb(file = ":memory:") {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   db.exec(SCHEMA);
+  for (const [table, column, type] of LATER_COLUMNS) {
+    const has = db.prepare(`select 1 from pragma_table_info('${table}') where name = ?`).get(column);
+    if (!has) db.exec(`alter table ${table} add column ${column} ${type}`);
+  }
   return db;
 }

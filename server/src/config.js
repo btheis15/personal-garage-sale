@@ -34,6 +34,8 @@ export function loadConfig(overrides = {}) {
     stripeSecretKey: (env.STRIPE_SECRET_KEY || "").trim(),
     stripeWebhookSecret: (env.STRIPE_WEBHOOK_SECRET || "").trim(),
     bchXpub: (env.BCH_XPUB || "").trim(),
+    // The small hot wallet (npm run new-hot-wallet): mints receipts as CashTokens and pays partners' commissions.
+    bchHotWalletWif: (env.BCH_HOT_WALLET_WIF || "").trim(),
     smtp: {
       host: env.SMTP_HOST || "smtp.gmail.com",
       port: int(env.SMTP_PORT, 465),

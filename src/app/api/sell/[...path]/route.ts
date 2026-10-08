@@ -7,7 +7,7 @@ import { shopApi } from "@/lib/shop";
  * The Sell app's requests, passed to the Mac mini's /api/admin/… with SHOP_ADMIN_TOKEN, once the
  * Sell app's sign-in is checked here. Photos (multipart) are streamed through as they are.
  */
-const ALLOWED = /^(items(\/many|\/[0-9a-f-]{36})?|photos|orders(\/[0-9a-f-]{36})?|charge|settings|status)$/;
+const ALLOWED = /^(items(\/many|\/[0-9a-f-]{36})?|photos|orders(\/[0-9a-f-]{36})?|charge|settings|status|receipts|partners(\/[0-9a-f-]{36})?)$/;
 
 async function pass(request: Request, ctx: RouteContext<"/api/sell/[...path]">) {
   const denied = await requireAdmin(request);

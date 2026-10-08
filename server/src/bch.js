@@ -5,8 +5,28 @@
  * blockchain through public Fulcrum servers and accepts a payment at zero-conf once no
  * double-spend proof turns up within a few seconds. Coupons and rewards are left off.
  */
+import { createBchChain, parseXpub } from "./bch-engine/bch.js";
 import { createBchCheckout } from "./bch-engine/checkout.js";
-import { parseXpub } from "./bch-engine/bch.js";
+import { createHotWallet } from "./bch-engine/hot-wallet.js";
+import { createReceiptIssuer } from "./bch-engine/receipts.js";
+import { createSanctions } from "./bch-engine/sanctions.js";
+
+/**
+ * The US sanctions list (OFAC SDN), for partners' payout addresses: downloaded at most once a day, kept in the
+ * database so a failed download keeps the last list.
+ */
+export function createSanctionsList(db, options = {}) {
+  const KEY = "ofac";
+  return createSanctions({
+    getMeta: () => {
+      const r = db.prepare("select value from bch_meta where name = ?").get(KEY);
+      return r ? JSON.parse(r.value) : null;
+    },
+    setMeta: (v) => db.prepare("insert into bch_meta (name, value) values (?, ?) on conflict(name) do update set value = excluded.value").run(KEY, JSON.stringify(v)),
+    log: (m) => console.warn(m),
+    ...options,
+  });
+}
 
 /** The engine's storage interface (bch-engine/memory-store.js), in SQLite. */
 export function createSqliteBchStore(db) {
@@ -68,7 +88,11 @@ export function createSqliteBchStore(db) {
   };
 }
 
-export function createBch({ config, db, store, notifier, chain, prices, engineOptions = {} }) {
+/**
+ * Bitcoin Cash for the garage sale. Receipts as CashTokens and partners' commissions need the hot wallet
+ * (BCH_HOT_WALLET_WIF): a small wallet whose key is on this Mac, holding only a little BCH for them.
+ */
+export function createBch({ config, db, store, notifier, chain: givenChain, prices, engineOptions = {}, partners = null, sanctions = null }) {
   let enabled = false;
   if (config.bchXpub) {
     try {
@@ -78,24 +102,64 @@ export function createBch({ config, db, store, notifier, chain, prices, engineOp
       console.error(`[bch] BCH_XPUB isn't a usable xPub (${e.message}); Bitcoin Cash is off.`);
     }
   }
-  if (!enabled) return { enabled: false };
+  if (!enabled) return { enabled: false, receiptsOn: () => false, partnersOn: () => false };
+
+  const chain = givenChain ?? createBchChain();
+  const bchStore = createSqliteBchStore(db);
+  let wallet = null;
+  if (config.bchHotWalletWif) {
+    try {
+      wallet = createHotWallet({ wif: config.bchHotWalletWif, chain });
+      wallet.info();
+    } catch (e) {
+      console.error(`[bch] BCH_HOT_WALLET_WIF isn't a usable key (${e.message}); receipts and commissions are off.`);
+      wallet = null;
+    }
+  }
+  const settings = () => store.getSettings();
+  /** What each receipt carries besides the order: the note and contact come from Settings. */
+  const receiptLook = (s) => ({ note: s.receiptNote ?? "", contact: s.contactEmail || s.contactPhone || "", returns: "Used items, sold as is: all sales final.", website: true, reward: false });
+  const receipts = wallet
+    ? createReceiptIssuer({
+        wallet,
+        store: bchStore,
+        siteUrl: () => config.siteUrl,
+        shopName: settings().name,
+        look: receiptLook(settings()),
+      })
+    : null;
 
   const engine = createBchCheckout({
     xpub: config.bchXpub,
-    store: createSqliteBchStore(db),
-    ...(chain ? { chain } : {}),
+    store: bchStore,
+    chain,
     ...(prices ? { prices } : {}),
+    receipts,
+    commissions: wallet && partners ? { wallet, isBlocked: (a) => sanctions?.isBlocked(a) ?? false, onCommission: (p, c) => partners.record(store.getOrder(p.id), c) } : null,
     onPaid: (p) => {
       const changed = store.markPaid(p.id, "bch");
-      if (changed) notifier.paid(changed);
+      if (!changed) return;
+      // Through a partner's link: on their page as "on its way" until the engine reports it sent.
+      if (p.partner && partners) partners.record(changed, { partnerId: p.partner.id, ratePercent: p.partner.ratePercent, state: "pending" });
+      // The buyer chose the CashToken alone and it's going straight to their wallet: no receipt email.
+      notifier.paid(changed, { skipBuyer: engine.receiptReplacesEmail(p) });
     },
     onNotice: (p, n) => n.problem && console.warn(`[bch] order ${p.id}: ${n.message}`),
     ...engineOptions,
   });
 
+  /** Receipts as CashTokens are offered once the collection exists. */
+  let receiptsReady = false;
+  const refreshReceipts = async () => {
+    receiptsReady = Boolean(receipts && (await receipts.status().catch(() => null))?.collection);
+    return receiptsReady;
+  };
+  void refreshReceipts();
+
   /** Starts the order's payment (an address and a price), or returns the one already going. */
   async function start(order) {
     if (await engine.payment(order.id)) return engine.check(order.id);
+    const receipt = receiptsReady ? (order.receiptPref ?? (order.customer?.email ? "email" : "token")) : "email";
     return engine.start({
       id: order.id,
       label: `Order ${order.number}`,
@@ -105,6 +169,8 @@ export function createBch({ config, db, store, notifier, chain, prices, engineOp
       shippingLabel: order.shippingCents ? "Shipping" : null,
       number: order.number,
       items: order.items.map((i) => ({ title: i.title, option: null, qty: i.qty, unitCents: i.priceCents })),
+      receipt,
+      partner: wallet && partners ? partners.forPayment(order.partnerId) : null,
     });
   }
 
@@ -122,6 +188,9 @@ export function createBch({ config, db, store, notifier, chain, prices, engineOp
   let timer = null;
   return {
     enabled: true,
+    hotWallet: Boolean(wallet),
+    receiptsOn: () => receiptsReady,
+    partnersOn: () => Boolean(wallet && partners && settings().partners.enabled),
     firstAddress: () => engine.firstAddress(),
     start,
     status,
@@ -132,9 +201,44 @@ export function createBch({ config, db, store, notifier, chain, prices, engineOp
     walletQuote: (id, input) => engine.walletQuote(id, input),
     walletBuild: (id, input) => engine.walletBuild(id, input),
     walletSubmit: (id, hex) => engine.walletSubmit(id, hex),
+    claimReceipt: (id, address) => engine.claimReceipt(id, address),
+    commission: (id) => engine.commission(id),
+    /** What wallets read about a receipt collection (served at /bcmr/<category>.json). */
+    registry: (category) => (receipts ? receipts.registry(category) : null),
+    /** The hot wallet for Settings: its address and what it holds. */
+    async hotWalletStatus() {
+      if (!wallet) return null;
+      const w = wallet.info();
+      return { address: w.address, balance: await wallet.balance() };
+    },
+    /** After Settings are saved: the next receipts carry the new note and contact (no transaction). */
+    async syncReceiptLook() {
+      if (!receipts || !(await refreshReceipts())) return;
+      const want = receiptLook(settings());
+      const have = await receipts.look();
+      if (want.note !== have.note || want.contact !== have.contact) await receipts.update({ look: { note: want.note, contact: want.contact } });
+    },
+    async receiptsStatus() {
+      return receipts ? receipts.status() : null;
+    },
+    /** Makes the receipt collection (once): "<Shop> Receipt", with the shop's icon. */
+    async createReceipts(input = {}) {
+      if (!receipts) throw Object.assign(new Error("Set BCH_HOT_WALLET_WIF first (npm run new-hot-wallet), and send it a little BCH."), { status: 409 });
+      const s = settings();
+      const out = await receipts.create({
+        name: String(input.name || `${s.name} Receipt`).slice(0, 60),
+        description: String(input.description || `Your receipt from ${s.name}: what you bought, what you paid, and when. One of a kind.`).slice(0, 300),
+        icon: input.icon || (config.siteUrl ? `${config.siteUrl}/receipt-token.png` : undefined),
+      });
+      await refreshReceipts();
+      return out;
+    },
     async run() {
       await engine.watchAll().catch((e) => console.error("[bch] watch:", e.message));
-      timer = setInterval(() => engine.tick().catch((e) => console.error("[bch] tick:", e.message)), 60_000);
+      timer = setInterval(() => {
+        engine.tick().catch((e) => console.error("[bch] tick:", e.message));
+        void refreshReceipts();
+      }, 60_000);
     },
     stop() {
       clearInterval(timer);

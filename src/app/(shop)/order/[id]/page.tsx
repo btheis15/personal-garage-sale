@@ -25,7 +25,15 @@ export default async function OrderPage(props: PageProps<"/order/[id]">) {
   }
 
   // Starts the Bitcoin Cash payment on the first visit (an address and a price), or looks at it again.
-  const bch = order.method === "bch" && order.status === "pending" ? await shopApi<BchView>(`/api/orders/${id}/bch/start`, { method: "POST", body: {} }).catch(() => null) : null;
+  // Paid already: the payment as it ended, for the wallet receipt.
+  const bch =
+    order.method !== "bch"
+      ? null
+      : order.status === "pending"
+        ? await shopApi<BchView>(`/api/orders/${id}/bch/start`, { method: "POST", body: {} }).catch(() => null)
+        : order.status === "paid" || order.status === "completed"
+          ? await shopApi<BchView>(`/api/orders/${id}/bch`).catch(() => null)
+          : null;
   const { settings: s } = await freshSettings();
   return (
     <OrderView
