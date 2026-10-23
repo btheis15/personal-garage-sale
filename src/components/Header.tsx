@@ -151,6 +151,11 @@ export function Header({ name, categories }: { name: string; categories: Categor
                 About & pickup
               </Link>
             </li>
+            <li>
+              <Link href="/sell" tabIndex={menuOpen ? 0 : -1} className="mt-2 flex h-12 items-center font-bold text-tag-dark underline">
+                Owner login: add items
+              </Link>
+            </li>
           </ul>
           <div className="relative m-4 overflow-hidden rounded-2xl bg-tag-dark p-5 text-paper">
             <Starburst className="absolute -top-6 -right-6 size-24 text-[0.6rem]" />
