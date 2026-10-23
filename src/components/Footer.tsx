@@ -62,7 +62,12 @@ export function Footer({ settings, sharing = false }: { settings: SiteSettings; 
             <p className="text-paper/70">Cards, Apple Pay, Google Pay and Bitcoin Cash welcome.</p>
           </div>
         </div>
-        <p className="mt-12 text-xs text-paper/50">© {new Date().getFullYear()} {settings.name}. Thanks for stopping by.</p>
+        <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-xs text-paper/50">© {new Date().getFullYear()} {settings.name}. Thanks for stopping by.</p>
+          <Link href="/sell" className="btn btn-light">
+            Owner login: add &amp; manage items →
+          </Link>
+        </div>
       </div>
     </footer>
   );
