@@ -3,7 +3,7 @@ export const DEFAULT_SETTINGS = {
   name: "Brian's Garage Sale",
   tagline: "Things from around our house that we don't need anymore.",
   about:
-    "Hi, I'm Brian. We live in town with our family, and like every family we end up with more stuff than we need. Everything here is ours, priced to go to a good home. Most things are pickup from our driveway; you can pay online by card or Bitcoin Cash, or hold it and pay when you come by.",
+    "Hi, I'm Brian. We live in town with our family, and like every family we end up with more stuff than we need. Everything here is ours, priced to go to a good home. Take a look around, and if something catches your eye, it can be yours in a couple of clicks.",
   pickupArea: "Local pickup (set your area in Sell → Settings)",
   pickupInstructions: "I'll send you our address and we'll find a time that works. Usually evenings and weekends.",
   contactEmail: "",

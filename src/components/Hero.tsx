@@ -48,7 +48,7 @@ export function Hero({ title, tagline, count, items }: { title: string; tagline:
               </span>
             </Link>
             <Link href="/about" className="btn btn-outline">
-              How pickup works
+              How it works
             </Link>
           </div>
         </div>

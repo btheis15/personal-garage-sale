@@ -62,7 +62,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
   const shippingCents = ship ? Math.max(0, ...items.map((i) => i.shippingEstimate ?? options.defaultShippingCents)) : 0;
   const methods: { value: Method; label: string; hint: string }[] = [
     ...(options.stripe ? [{ value: "stripe" as const, label: "Card, Apple Pay or Google Pay", hint: `Secure checkout through Stripe${options.stripeTest ? " (test mode: use card 4242 4242 4242 4242)" : ""}` }] : []),
-    ...(options.bch ? [{ value: "bch" as const, label: "Bitcoin Cash", hint: "Pay from any BCH wallet: scan a QR code or connect your wallet" }] : []),
+    ...(options.bch ? [{ value: "bch" as const, label: "Bitcoin Cash", hint: "Pay from your wallet" }] : []),
     ...(options.payAtPickup && !ship
       ? [{ value: "pickup" as const, label: "Pay at pickup", hint: `I'll hold it for ${options.payAtPickupHours} hours. Cash${options.venmo ? ` or Venmo (${options.venmo})` : ""} when you pick it up.` }]
       : []),

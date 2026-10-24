@@ -21,13 +21,13 @@ export default async function Home() {
   const categories = CATEGORIES.map((c) => ({ ...c, count: forSale.filter((i) => i.category === c.value).length, cover: forSale.find((i) => i.category === c.value && i.photos[0]) })).filter((c) => c.count);
 
   const promises = [
-    { icon: "M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z M12 7a2.5 2.5 0 110 5 2.5 2.5 0 010-5", title: "Pick it up nearby", text: settings.pickupArea },
-    { icon: "M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z M9 12l2 2 4-4", title: "Pay safely online", text: `Card, Apple Pay, Google Pay or Bitcoin Cash${settings.payAtPickup ? ", or at pickup" : ""}` },
+    { icon: "M12 21s7-6.2 7-11.5A7 7 0 005 9.5C5 14.8 12 21 12 21z M12 7a2.5 2.5 0 110 5 2.5 2.5 0 010-5", title: "Easy handoff", text: "We'll find a time that works for you" },
+    { icon: "M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z M9 12l2 2 4-4", title: "Pay safely online", text: "Card, Apple Pay or Google Pay" },
     { icon: "M3 12V4h8l10 10-8 8L3 12z M7.5 7a1.5 1.5 0 110 3 1.5 1.5 0 010-3", title: "Held just for you", text: "Once you check out, nobody else can buy it" },
   ];
   const steps = [
     { n: 1, title: "Find something you like", text: "Everything here is from our house. New things go up all the time." },
-    { n: 2, title: "Pay online, or hold it", text: `By card or Bitcoin Cash, or hold it ${settings.payAtPickupHours} hours and pay at pickup.` },
+    { n: 2, title: "Check out", text: "Pay securely online, or hold it for a day or two." },
     { n: 3, title: "Come grab it", text: "I'll send the address and we'll find a time. Usually evenings and weekends." },
   ];
 
@@ -161,7 +161,7 @@ export default async function Home() {
             <h2 className="mt-2 text-4xl md:text-5xl">A real family, a real garage</h2>
             <p className="mt-5 max-w-md leading-relaxed whitespace-pre-line text-ink/80">{settings.about}</p>
             <Link href="/about" className="btn btn-outline mt-8">
-              Pickup & questions
+              About & questions
             </Link>
           </div>
         </div>
