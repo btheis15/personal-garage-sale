@@ -9,7 +9,7 @@ export default async function AboutPage() {
     { q: "Where do I pick things up?", a: `${s.pickupArea}. Once you've paid (or put something on hold), I'll send the address and we'll find a time.` },
     {
       q: "How can I pay?",
-      a: `Online with a card, Apple Pay or Google Pay (through Stripe, so I never see your card).${s.payAtPickup ? ` Or put it on hold for ${s.payAtPickupHours} hours and pay at pickup with cash${s.venmo ? ` or Venmo (${s.venmo})` : ""}.` : ""}`,
+      a: `Online with a card, Apple Pay or Google Pay (through Stripe, so I never see your card), or Bitcoin Cash.${s.payAtPickup ? ` Or put it on hold for ${s.payAtPickupHours} hours and pay at pickup with cash${s.venmo ? ` or Venmo (${s.venmo})` : ""}.` : ""}`,
     },
     { q: "Is the price firm?", a: "Items marked \"or best offer\" are open to offers: send me a message. Everything else is priced to sell." },
     { q: "Can you ship it?", a: s.shipping ? "Items that say \"Ships\" can be shipped within the US; the price is shown on the item. Everything else I hand off in person." : "For now I hand things off in person: once you check out, I'll send the address and we'll find a time." },
