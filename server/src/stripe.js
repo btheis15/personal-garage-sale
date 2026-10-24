@@ -19,7 +19,15 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
     const base = config.siteUrl;
     const image = (photo) => (photo && base ? `${base}${photo}` : null);
     const session = await client.checkout.sessions.create({
+      ui_mode: "hosted_page",
       mode: "payment",
+      billing_address_collection: "auto",
+      automatic_tax: { enabled: false },
+      allow_promotion_codes: false,
+      submit_type: "auto",
+      integration_identifier: "hosted_web_0002",
+      origin_context: "web",
+      branding_settings: { background_color: "#ffffff", button_color: "#0074d4", font_family: "default", border_style: "rounded" },
       client_reference_id: order.id,
       metadata: { order_id: order.id, order_number: String(order.number) },
       payment_intent_data: { metadata: { order_id: order.id, order_number: String(order.number) }, description: `${s.name} order #${order.number}` },
