@@ -38,6 +38,7 @@ export function Header({ name, categories }: { name: string; categories: Categor
   const underline = "absolute inset-x-0 bottom-5 h-0.5 origin-left scale-x-0 rounded-full bg-amber transition-transform duration-300";
 
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/80">
       <div className="container-page flex h-16 items-center justify-between gap-2 md:h-20">
         <div className="flex flex-1 items-center md:hidden">
@@ -127,45 +128,47 @@ export function Header({ name, categories }: { name: string; categories: Categor
         </form>
       )}
 
-      {/* The menu on a phone: slides in, its links following one after another. */}
-      <div className={`fixed inset-0 z-50 md:hidden ${menuOpen ? "" : "pointer-events-none"}`} aria-hidden={!menuOpen}>
-        <div className={`absolute inset-0 bg-ink/40 transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0"}`} onClick={() => setMenuOpen(false)} />
-        <nav aria-label="Mobile" className={`absolute inset-y-0 left-0 flex w-[85%] max-w-sm flex-col bg-paper shadow-xl transition-transform duration-300 ease-soft ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <div className="flex h-16 items-center justify-between border-b border-line px-4">
-            <span className="font-display text-2xl">Menu</span>
-            <button type="button" className="-mr-2 grid size-11 place-items-center" aria-label="Close menu" onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1}>
-              <CloseIcon />
-            </button>
-          </div>
-          <ul className="flex-1 overflow-y-auto px-4 py-2">
-            {[{ href: "/shop", label: "Everything for sale", count: null as number | null }, ...categories.map((c) => ({ href: `/shop?category=${c.value}`, label: c.label, count: c.count as number | null }))].map((item, i) => (
-              <li key={item.href} style={{ transitionDelay: menuOpen ? `${120 + i * 45}ms` : "0ms" }} className={`transition duration-500 ease-soft ${menuOpen ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"}`}>
-                <Link href={item.href} tabIndex={menuOpen ? 0 : -1} className="flex h-13 items-center justify-between border-b border-line py-3 font-display text-xl">
-                  {item.label}
-                  {item.count !== null && <span className="font-sans text-sm text-muted">{item.count}</span>}
-                </Link>
-              </li>
-            ))}
-            <li>
-              <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="flex h-12 items-center">
-                About & pickup
-              </Link>
-            </li>
-            <li>
-              <Link href="/sell" tabIndex={menuOpen ? 0 : -1} className="mt-2 flex h-12 items-center font-bold text-tag-dark underline">
-                Owner login: add items
-              </Link>
-            </li>
-          </ul>
-          <div className="relative m-4 overflow-hidden rounded-2xl bg-tag-dark p-5 text-paper">
-            <Starburst className="absolute -top-6 -right-6 size-24 text-[0.6rem]" />
-            <p className="font-display text-xl">Questions?</p>
-            <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="mt-1 inline-block text-sm text-amber-light underline">
-              How pickup and payment work
-            </Link>
-          </div>
-        </nav>
-      </div>
     </header>
+
+    {/* The menu on a phone: slides in, its links following one after another. Rendered outside the header: the header's backdrop-blur would otherwise trap this fixed overlay inside the 64px bar. */}
+    <div className={`fixed inset-0 z-50 md:hidden ${menuOpen ? "" : "pointer-events-none"}`} aria-hidden={!menuOpen}>
+      <div className={`absolute inset-0 bg-ink/40 transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0"}`} onClick={() => setMenuOpen(false)} />
+      <nav aria-label="Mobile" className={`absolute inset-y-0 left-0 flex w-[85%] max-w-sm flex-col bg-paper shadow-xl transition-transform duration-300 ease-soft ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-16 items-center justify-between border-b border-line px-4">
+          <span className="font-display text-2xl">Menu</span>
+          <button type="button" className="-mr-2 grid size-11 place-items-center" aria-label="Close menu" onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1}>
+            <CloseIcon />
+          </button>
+        </div>
+        <ul className="flex-1 overflow-y-auto px-4 py-2">
+          {[{ href: "/shop", label: "Everything for sale", count: null as number | null }, ...categories.map((c) => ({ href: `/shop?category=${c.value}`, label: c.label, count: c.count as number | null }))].map((item, i) => (
+            <li key={item.href} style={{ transitionDelay: menuOpen ? `${120 + i * 45}ms` : "0ms" }} className={`transition duration-500 ease-soft ${menuOpen ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"}`}>
+              <Link href={item.href} tabIndex={menuOpen ? 0 : -1} className="flex h-13 items-center justify-between border-b border-line py-3 font-display text-xl">
+                {item.label}
+                {item.count !== null && <span className="font-sans text-sm text-muted">{item.count}</span>}
+              </Link>
+            </li>
+          ))}
+          <li>
+            <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="flex h-12 items-center">
+              About & pickup
+            </Link>
+          </li>
+          <li>
+            <Link href="/sell" tabIndex={menuOpen ? 0 : -1} className="mt-2 flex h-12 items-center font-bold text-tag-dark underline">
+              Owner login: add items
+            </Link>
+          </li>
+        </ul>
+        <div className="relative m-4 shrink-0 overflow-hidden rounded-2xl bg-tag-dark p-5 text-paper">
+          <Starburst className="absolute -top-6 -right-6 size-24 text-[0.6rem]" />
+          <p className="font-display text-xl">Questions?</p>
+          <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="mt-1 inline-block text-sm text-amber-light underline">
+            How pickup and payment work
+          </Link>
+        </div>
+      </nav>
+    </div>
+    </>
   );
 }
