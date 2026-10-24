@@ -63,7 +63,7 @@ export function CartDrawer() {
                       <p className="leading-snug">{item.title}</p>
                       <p className="shrink-0 font-bold">{money(item.priceCents * item.qty)}</p>
                     </div>
-                    <p className="text-sm text-muted">{item.ships ? (item.pickup ? "Pickup or shipping" : "Ships") : "Pickup only"}</p>
+                    {item.ships && !item.pickup && <p className="text-sm text-muted">Ships</p>}
                     <div className="mt-auto flex items-center justify-between pt-2">
                       {item.maxQty > 1 ? (
                         <div className="flex items-center rounded-full border border-line bg-white">

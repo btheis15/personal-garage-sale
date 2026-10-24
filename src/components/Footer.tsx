@@ -28,7 +28,7 @@ export function Footer({ settings, sharing = false }: { settings: SiteSettings; 
             </p>
             <p>
               <Link href="/about" className="hover:text-amber-light">
-                Pickup, payment & questions
+                About & questions
               </Link>
             </p>
             {sharing && (

@@ -14,7 +14,7 @@ export function PrintView({ items, settings, payments, chosen }: { items: Item[]
   const [mode, setMode] = useState<"tags" | "sign">(chosen ? "tags" : "sign");
   const [picked, setPicked] = useState<Set<string>>(() => new Set(chosen ?? items.map((i) => i.id)));
   const origin = useOrigin();
-  const ways = [payments.stripe && "card, Apple Pay, Google Pay", payments.bch && "Bitcoin Cash", "cash", settings.venmo && `Venmo ${settings.venmo}`].filter(Boolean).join(" · ");
+  const ways = [payments.stripe && "card, Apple Pay, Google Pay", "cash", settings.venmo && `Venmo ${settings.venmo}`].filter(Boolean).join(" · ");
   const tags = items.filter((i) => picked.has(i.id));
   const toggle = (id: string) => setPicked((p) => (p.has(id) ? new Set([...p].filter((x) => x !== id)) : new Set([...p, id])));
 

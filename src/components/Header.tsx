@@ -91,7 +91,7 @@ export function Header({ name, categories }: { name: string; categories: Categor
             </div>
           </div>
           <Link href="/about" className={`group/link relative py-7 font-medium transition-colors hover:text-tag ${pathname === "/about" ? "text-tag" : ""}`}>
-            About & pickup
+            About & questions
             <span className={`${underline} group-hover/link:scale-x-100`} />
           </Link>
         </nav>
@@ -151,7 +151,7 @@ export function Header({ name, categories }: { name: string; categories: Categor
           ))}
           <li>
             <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="flex h-12 items-center">
-              About & pickup
+              About & questions
             </Link>
           </li>
           <li>
@@ -164,7 +164,7 @@ export function Header({ name, categories }: { name: string; categories: Categor
           <Starburst className="absolute -top-6 -right-6 size-24 text-[0.6rem]" />
           <p className="font-display text-xl">Questions?</p>
           <Link href="/about" tabIndex={menuOpen ? 0 : -1} className="mt-1 inline-block text-sm text-amber-light underline">
-            How pickup and payment work
+            How it works
           </Link>
         </div>
       </nav>
