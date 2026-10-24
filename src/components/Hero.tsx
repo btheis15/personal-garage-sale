@@ -29,7 +29,8 @@ export function Hero({ title, tagline, count, items }: { title: string; tagline:
             {words.map((w, i) => (
               // The space sits between the words: inside an inline-block it would be dropped.
               <span key={i}>
-                <span className="animate-rise inline-block" style={delay(i + 1)}>
+                {/* Padding (cancelled by the negative margin) keeps the ascenders and descenders inside the box: line-height 1 is shorter than the glyphs, and Safari clips a filtered or composited box to its edges. */}
+                <span className="animate-rise -my-[0.2em] inline-block py-[0.2em]" style={delay(i + 1)}>
                   {w}
                 </span>
                 {i < words.length - 1 && " "}
