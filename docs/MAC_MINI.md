@@ -120,7 +120,11 @@ All in `server/.env`, then `launchctl kickstart -k gui/$(id -u)/com.garagesale.s
 3. Try a $0.25 item (BCH has no test network).
 4. Optional: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` in Vercel for "Connect wallet".
 
-**Bitcoin Cash extras (optional): wallet receipts and "Spread the word"**
+**Bitcoin Cash extras (later): CashTokens for wallet receipts and "Spread the word"**
+
+These are **off** for now: Bitcoin Cash buyers simply pay and get the receipt by email. To add them,
+put `BCH_CASHTOKENS=on` in `.env` and restart; then the steps below. (Coupons as CashTokens would plug
+into the same switch: the engine's `coupons` option in `server/src/bch.js`.)
 
 Both need a small **hot wallet** on the mini: a separate key that can spend, holding only pocket
 change. It makes the receipts (CashTokens) and pays friends their cut.
@@ -140,8 +144,16 @@ change. It makes the receipts (CashTokens) and pays friends their cut.
    remove them, or give one their own rate. If you change the terms (`src/components/share/ShareTerms.tsx`),
    bump `TERMS_VERSION` there and `PARTNER_TERMS_VERSION` in `server/src/site.js`.
 
-**Emails**: `SMTP_USER` (your Gmail) and `SMTP_PASS` (a Gmail app password:
-myaccount.google.com → App passwords). You get "Sold!" emails; buyers get a receipt with pickup details.
+**Emails**, sent from your iCloud address:
+1. account.apple.com → Sign-In and Security → **App-Specific Passwords** → make one called "Garage Sale".
+2. In `.env`: `SMTP_HOST=smtp.mail.me.com`, `SMTP_PORT=587`, `SMTP_USER=` and `MAIL_FROM=` your
+   @icloud.com address, `SMTP_PASS=` the app-specific password, `NOTIFY_EMAIL=` where your "Sold!"
+   emails go. Restart.
+3. `cd server && npm run email-preview -- --send <your address>` sends a test email.
+
+You get "Sold!" and "On hold" emails; buyers get a receipt (pickup details, or that it's shipping) or an
+"on hold for you" email. Their look is in `server/src/emails.js`; `npm run email-preview` writes samples
+to `data/email-preview/` to open in a browser.
 
 ## Day to day
 

@@ -28,8 +28,8 @@ browse by category. Sold things stay visible as **Sold** for two weeks.
   [bch_cashtoken_checkout](https://github.com/btheis15/bch_cashtoken_checkout), or
 - **at pickup** (cash or Venmo), with the item held for 48 hours.
 
-Bitcoin Cash buyers can also take a **wallet receipt**: a one-of-a-kind CashToken receipt sent to
-their wallet. And with **Spread the word** on, friends sign up at `/share`, get a link, and earn a
+Later, with CashTokens turned on (`BCH_CASHTOKENS=on` on the mini; off for now), Bitcoin Cash buyers
+can also take a **wallet receipt**: a one-of-a-kind CashToken receipt sent to their wallet. And with **Spread the word** on, friends sign up at `/share`, get a link, and earn a
 cut of Bitcoin Cash sales through it, paid straight to their wallet as the buyer pays (both need the
 small hot wallet in `docs/MAC_MINI.md`).
 

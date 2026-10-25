@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Bunting, Starburst } from "@/components/ornaments";
 import { countryOptions } from "@/components/share/countries";
 import { ShareSignup } from "@/components/share/ShareSignup";
@@ -12,6 +13,8 @@ export const metadata: Metadata = {
 
 export default async function SharePage() {
   const [s, payments] = await Promise.all([getSettings(), getPayments()]);
+  // Only while "Spread the word" is open (it needs CashTokens on, BCH_CASHTOKENS on the mini).
+  if (!payments.partners) notFound();
   const rate = payments.partners?.ratePercent ?? null;
   const steps = [
     ["Get your link", "Sign up below: it takes a minute. You get a link to the whole sale, and one for any item."],

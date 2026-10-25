@@ -36,9 +36,13 @@ export function loadConfig(overrides = {}) {
     bchXpub: (env.BCH_XPUB || "").trim(),
     // The small hot wallet (npm run new-hot-wallet): mints receipts as CashTokens and pays partners' commissions.
     bchHotWalletWif: (env.BCH_HOT_WALLET_WIF || "").trim(),
+    // CashTokens (wallet receipts, "Spread the word", later coupons): off until BCH_CASHTOKENS=on.
+    // Plain Bitcoin Cash payments work either way.
+    bchCashTokens: /^(1|on|true|yes)$/i.test((env.BCH_CASHTOKENS || "").trim()),
     smtp: {
-      host: env.SMTP_HOST || "smtp.gmail.com",
-      port: int(env.SMTP_PORT, 465),
+      // iCloud Mail by default (SMTP_USER = the iCloud address, SMTP_PASS = an app-specific password).
+      host: env.SMTP_HOST || "smtp.mail.me.com",
+      port: int(env.SMTP_PORT, 587),
       user: env.SMTP_USER || "",
       pass: (env.SMTP_PASS || "").replace(/\s+/g, ""),
       from: env.MAIL_FROM || env.SMTP_USER || "",
