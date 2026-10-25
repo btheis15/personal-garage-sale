@@ -3,7 +3,11 @@
  * with its storage in the SQLite database. BCH_XPUB in .env is your wallet's xPub: it lists the
  * wallet's addresses but can't spend. Each order gets its own address; this Mac watches the
  * blockchain through public Fulcrum servers and accepts a payment at zero-conf once no
- * double-spend proof turns up within a few seconds. Coupons and rewards are left off.
+ * double-spend proof turns up within a few seconds.
+ *
+ * CashTokens (wallet receipts, "Spread the word" commissions, and coupons/rewards when they're added)
+ * stay off until BCH_CASHTOKENS=on. Without them, buyers simply pay in BCH and get the receipt by email.
+ * Coupons would plug into the engine's `coupons` option below.
  */
 import { createBchChain, parseXpub } from "./bch-engine/bch.js";
 import { createBchCheckout } from "./bch-engine/checkout.js";
@@ -102,12 +106,14 @@ export function createBch({ config, db, store, notifier, chain: givenChain, pric
       console.error(`[bch] BCH_XPUB isn't a usable xPub (${e.message}); Bitcoin Cash is off.`);
     }
   }
-  if (!enabled) return { enabled: false, receiptsOn: () => false, partnersOn: () => false };
+  if (!enabled) return { enabled: false, cashTokens: false, receiptsOn: () => false, partnersOn: () => false };
 
   const chain = givenChain ?? createBchChain();
   const bchStore = createSqliteBchStore(db);
+  const cashTokens = Boolean(config.bchCashTokens);
+  if (!cashTokens && config.bchHotWalletWif) console.warn("[bch] BCH_HOT_WALLET_WIF is set but CashTokens are off (BCH_CASHTOKENS); the hot wallet isn't used.");
   let wallet = null;
-  if (config.bchHotWalletWif) {
+  if (cashTokens && config.bchHotWalletWif) {
     try {
       wallet = createHotWallet({ wif: config.bchHotWalletWif, chain });
       wallet.info();
@@ -188,6 +194,7 @@ export function createBch({ config, db, store, notifier, chain: givenChain, pric
   let timer = null;
   return {
     enabled: true,
+    cashTokens,
     hotWallet: Boolean(wallet),
     receiptsOn: () => receiptsReady,
     partnersOn: () => Boolean(wallet && partners && settings().partners.enabled),
@@ -223,6 +230,7 @@ export function createBch({ config, db, store, notifier, chain: givenChain, pric
     },
     /** Makes the receipt collection (once): "<Shop> Receipt", with the shop's icon. */
     async createReceipts(input = {}) {
+      if (!cashTokens) throw Object.assign(new Error("CashTokens are off. Set BCH_CASHTOKENS=on in the Mac mini's .env first."), { status: 409 });
       if (!receipts) throw Object.assign(new Error("Set BCH_HOT_WALLET_WIF first (npm run new-hot-wallet), and send it a little BCH."), { status: 409 });
       const s = settings();
       const out = await receipts.create({

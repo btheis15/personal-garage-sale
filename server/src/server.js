@@ -32,7 +32,7 @@ if (bch.enabled) bch.run();
 
 const server = createApp({ config, store, stripe, bch, notifier, revalidator, partners, sanctions }).listen(config.port, config.host, () => {
   console.log(`[garage-sale] listening on http://${config.host}:${config.port}`);
-  if (bch.enabled) console.log(`[garage-sale] Hot wallet (receipts as CashTokens, partners' commissions): ${bch.hotWallet ? "on" : "off (BCH_HOT_WALLET_WIF)"}`);
+  if (bch.enabled) console.log(`[garage-sale] CashTokens (wallet receipts, Spread the word): ${!bch.cashTokens ? "off (BCH_CASHTOKENS)" : bch.hotWallet ? "on" : "on, but no hot wallet (BCH_HOT_WALLET_WIF)"}`);
   console.log(`[garage-sale] Stripe: ${stripe.enabled ? (stripe.testMode ? "test mode" : "live") : "off (STRIPE_SECRET_KEY)"} · Bitcoin Cash: ${bch.enabled ? `on, first address ${bch.firstAddress()}` : "off (BCH_XPUB)"} · emails: ${notifier.enabled ? "on" : "off (SMTP_USER/SMTP_PASS)"}`);
 });
 server.on("error", (e) => {

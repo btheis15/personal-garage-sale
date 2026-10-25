@@ -31,7 +31,7 @@ before(async () => {
     sanctionsFetch,
     bch: (store, db, { partners, sanctions, notifier }) =>
       createBch({
-        config: { bchXpub: XPUB, bchHotWalletWif: wif, siteUrl: "https://shop.test" },
+        config: { bchXpub: XPUB, bchCashTokens: true, bchHotWalletWif: wif, siteUrl: "https://shop.test" },
         db,
         store,
         notifier,

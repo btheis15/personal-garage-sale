@@ -331,7 +331,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   }));
 
   // "Spread the word": who's sharing the sale, what they've earned; pause one or give them their own rate.
-  sell.get("/partners", send(() => ({ partners: partners ? partners.list() : [], on: (bch.partnersOn?.() ?? false), hotWallet: Boolean(bch.hotWallet), sanctions: sanctions?.status() ?? null })));
+  sell.get("/partners", send(() => ({ partners: partners ? partners.list() : [], on: (bch.partnersOn?.() ?? false), cashTokens: Boolean(config.bchCashTokens), hotWallet: Boolean(bch.hotWallet), sanctions: sanctions?.status() ?? null })));
   sell.get("/partners/:id", send((req) => ({ commissions: partners ? partners.commissionsFor(req.params.id) : [] })));
   sell.patch("/partners/:id", express.json({ limit: "8kb" }), send((req) => {
     if (!partners) fail("Not found.", 404);
@@ -349,6 +349,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     stripe: stripe.enabled ? (stripe.testMode ? "test" : "live") : null,
     stripeWebhook: Boolean(config.stripeWebhookSecret),
     bch: bch.enabled,
+    cashTokens: Boolean(config.bchCashTokens),
     bchFirstAddress: bch.enabled ? bch.firstAddress() : null,
     hotWallet: bch.enabled ? Boolean(bch.hotWallet) : false,
     receipts: bch.enabled ? (bch.receiptsOn?.() ?? false) : false,

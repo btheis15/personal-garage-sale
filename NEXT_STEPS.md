@@ -170,7 +170,8 @@ All of these go in the **Mac mini's** `server/.env`, then restart:
 - [ ] Optional, in **Vercel**: `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` from dashboard.reown.com
       (add the site's domain there) for "Connect wallet". Redeploy.
 
-### Bitcoin Cash extras (optional, after BCH works)
+### Bitcoin Cash extras (later: CashTokens are off until `BCH_CASHTOKENS=on`)
+- [ ] `BCH_CASHTOKENS=on` in the mini's `.env`, restart
 - [ ] Hot wallet: on the mini `cd server && npm run new-hot-wallet` → key into `BCH_HOT_WALLET_WIF`
       in `.env`, restart, send its address ~0.001 BCH (docs/MAC_MINI.md → "Bitcoin Cash extras")
 - [ ] **Sell → Settings → Set up wallet receipts** (once), then pay a $0.25 item choosing
@@ -179,10 +180,11 @@ All of these go in the **Mac mini's** `server/.env`, then restart:
       sign up yourself at `/share` with a second wallet, buy through the link, and check the cut
       arrives and shows on `/share/me` and in **See your friends**
 
-### Order emails
-- [ ] `SMTP_USER=<my gmail>` and `SMTP_PASS=<Gmail app password>` (myaccount.google.com → App
-      passwords). Optional `NOTIFY_EMAIL` (where "Sold!" emails go) and `MAIL_FROM`.
-- [ ] Restart, do a test order, and check both emails arrive (mine and the buyer's receipt)
+### Order emails (from my iCloud address)
+- [ ] account.apple.com → Sign-In and Security → App-Specific Passwords → new one, "Garage Sale"
+- [ ] In the mini's `.env`: `SMTP_HOST=smtp.mail.me.com`, `SMTP_PORT=587`, `SMTP_USER` and `MAIL_FROM`
+      = my iCloud address, `SMTP_PASS` = the app-specific password, `NOTIFY_EMAIL` = where "Sold!" goes
+- [ ] Restart, `npm run email-preview -- --send <me>`, then a test order: both emails arrive (mine and the buyer's receipt)
 
 ## 7. Before announcing it
 

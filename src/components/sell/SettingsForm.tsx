@@ -12,6 +12,8 @@ type Setup = {
   stripeWebhook: boolean;
   bch: boolean;
   bchFirstAddress: string | null;
+  /** CashTokens extras (wallet receipts, Spread the word): BCH_CASHTOKENS=on in the mini's .env. */
+  cashTokens: boolean;
   hotWallet: boolean;
   receipts: boolean;
   walletConnect: boolean;
@@ -57,9 +59,11 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
     { ok: Boolean(setup.stripe), label: setup.stripe ? `Stripe: ${setup.stripe === "test" ? "test mode (no real money)" : "live"}` : "Card payments (Stripe)", hint: "STRIPE_SECRET_KEY from your personal Stripe account, in the mini's .env." },
     { ok: setup.stripeWebhook, label: "Stripe's payment notices", hint: `Stripe → Developers → Webhooks → ${setup.publicUrl ?? "<the mini's PUBLIC_URL>"}/stripe/webhook, then STRIPE_WEBHOOK_SECRET in the mini's .env.` },
     { ok: setup.bch, label: setup.bchFirstAddress ? `Bitcoin Cash: first address …${setup.bchFirstAddress.slice(-8)} (check it matches your wallet)` : "Bitcoin Cash", hint: "BCH_XPUB (your wallet's xPub, which can't spend) in the mini's .env." },
-    { ok: setup.hotWallet, label: "BCH hot wallet (optional)", hint: "For wallet receipts and Spread the word payouts: npm run new-hot-wallet on the mini, BCH_HOT_WALLET_WIF in its .env, then send it about 0.001 BCH." },
+    ...(setup.cashTokens
+      ? [{ ok: setup.hotWallet, label: "BCH hot wallet (optional)", hint: "For wallet receipts and Spread the word payouts: npm run new-hot-wallet on the mini, BCH_HOT_WALLET_WIF in its .env, then send it about 0.001 BCH." }]
+      : [{ ok: false, label: "CashTokens extras (later)", hint: "Wallet receipts and Spread the word, for Bitcoin Cash buyers. Off for now; Bitcoin Cash payments work without them. To add: BCH_CASHTOKENS=on in the mini's .env (docs/MAC_MINI.md)." }]),
     { ok: setup.walletConnect, label: "BCH “Connect wallet” (optional)", hint: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in Vercel, from dashboard.reown.com." },
-    { ok: setup.email, label: "Order emails (optional)", hint: "SMTP_USER and SMTP_PASS (a Gmail app password) in the mini's .env." },
+    { ok: setup.email, label: "Order emails (optional)", hint: "SMTP_USER (your iCloud address) and SMTP_PASS (an app-specific password from account.apple.com) in the mini's .env." },
   ];
 
   return (
@@ -119,7 +123,7 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
           )}
         </div>
 
-        {setup.bch && (
+        {setup.bch && setup.cashTokens && (
           <div className="space-y-3 rounded-2xl border border-line bg-white p-4">
             <p className="font-bold">Bitcoin Cash extras</p>
             <Field label="Line printed on wallet receipts">
@@ -161,7 +165,7 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
         </button>
       </form>
 
-      {setup.bch && <ReceiptsSetup hotWallet={setup.hotWallet} />}
+      {setup.bch && setup.cashTokens && <ReceiptsSetup hotWallet={setup.hotWallet} />}
 
       <section className="mt-10">
         <h2 className="text-xl">Setup</h2>
