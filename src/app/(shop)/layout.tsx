@@ -3,6 +3,7 @@ import { ViewTransition } from "react";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { MyHoldsBar } from "@/components/MyHoldsBar";
 import { RevealObserver } from "@/components/motion/RevealObserver";
 import { availability } from "@/lib/availability";
 import { PartnerRef } from "@/components/share/PartnerRef";
@@ -21,6 +22,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       {isSample && <div className="bg-sun px-4 py-1.5 text-center text-xs font-semibold text-ink">Preview: showing sample items until the Mac mini is connected (see docs/MAC_MINI.md).</div>}
       {settings.announcement && <div className="bg-amber px-4 py-2 text-center text-sm font-semibold text-tag-dark">{settings.announcement}</div>}
       <Header name={settings.name} categories={categories} />
+      <MyHoldsBar />
       <ViewTransition default="none" update="page">
         <main id="main">{children}</main>
       </ViewTransition>

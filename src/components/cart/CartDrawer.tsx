@@ -5,10 +5,12 @@ import { useEffect } from "react";
 import { money } from "@/lib/site";
 import { CloseIcon, MinusIcon, PlusIcon } from "../icons";
 import { ItemPhoto } from "../ItemPhoto";
+import { useMyOrders } from "../myOrders";
 import { cart, useCart } from "./store";
 
 export function CartDrawer() {
   const { items, open, subtotal, count } = useCart();
+  const holds = useMyOrders();
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +39,17 @@ export function CartDrawer() {
             <CloseIcon />
           </button>
         </div>
+
+        {holds.length > 0 && (
+          <div className="border-b border-line bg-leaf-light px-4 py-3 md:px-6">
+            {holds.map((o) => (
+              <Link key={o.id} href={`/order/${o.id}`} onClick={() => cart.close()} tabIndex={t} className="flex items-center justify-between gap-3 py-1 text-sm font-semibold text-leaf">
+                <span>{o.status === "reserved" ? `On hold for you: order #${o.number}` : `Order #${o.number}: waiting for payment`}</span>
+                <span className="shrink-0 underline underline-offset-4">See or cancel →</span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">

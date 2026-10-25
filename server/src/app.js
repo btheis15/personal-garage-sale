@@ -47,7 +47,7 @@ function readCustomer(v) {
 }
 const readLines = (v) => (Array.isArray(v) ? v : []).slice(0, 50).map((l) => ({ id: str(l?.id, 40), qty: Number(l?.qty) || 1 }));
 
-export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null }) {
+export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null, push = null }) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
@@ -190,6 +190,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       await bch.close(order.id).catch(() => {});
     }
     store.releaseOrder(order.id, "cancelled");
+    // A hold for pickup: Brian hears it's back on sale. (A card or BCH payment given up on isn't news.)
+    if (order.status === "reserved") notifier.cancelled?.(order);
     return { status: "cancelled" };
   }));
 
@@ -338,6 +340,20 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     return { partner: partners.update(req.params.id, req.body ?? {}) };
   }));
 
+  // Notifications on Brian's phone (push.js): the key to sign up with, sign up / off, and a test.
+  sell.get("/push", send(() => ({ publicKey: push?.publicKey ?? null, phones: push?.count() ?? 0 })));
+  sell.post("/push", express.json({ limit: "8kb" }), send((req) => {
+    if (!push) fail("Notifications aren't available.", 503);
+    const b = req.body ?? {};
+    if (b.action === "off") return push.unsubscribe(str(b.endpoint, 1000));
+    if (b.action === "check") return { on: push.has(str(b.endpoint, 1000)) };
+    return push.subscribe(b.subscription, str(b.label, 80));
+  }));
+  sell.post("/push/test", send(async () => {
+    if (!push) fail("Notifications aren't available.", 503);
+    return push.send({ title: "Notifications are on", body: "You'll get one here when something's held, sold, or a hold is cancelled.", url: "/sell/orders", tag: "test" });
+  }));
+
   sell.get("/settings", send(() => ({ settings: store.getSettings() })));
   sell.put("/settings", express.json({ limit: "32kb" }), send(async (req) => {
     const settings = store.saveSettings(req.body ?? {});
@@ -355,6 +371,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     receipts: bch.enabled ? (bch.receiptsOn?.() ?? false) : false,
     partners: bch.enabled ? (bch.partnersOn?.() ?? false) : false,
     email: notifier.enabled,
+    phones: push?.count() ?? 0,
     publicUrl: config.publicUrl || null,
     website: revalidator.status(),
   })));

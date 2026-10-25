@@ -18,7 +18,7 @@ export async function startServer({ stripe = fakeStripe(), bch = { enabled: fals
   const config = loadConfig({ dataDir: dir, siteToken: SITE, adminToken: ADMIN, siteUrl: "https://shop.test" });
   const db = openDb(":memory:");
   const sent = [];
-  const notifier = { enabled: true, paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]) };
+  const notifier = { enabled: true, paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]), cancelled: (o) => sent.push(["cancelled", o.number]) };
   const store = createStore(db);
   const s = typeof stripe === "function" ? stripe(store) : stripe;
   const sanctions = createSanctionsList(db, sanctionsFetch ? { fetchImpl: sanctionsFetch } : {});

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { SiteSettings } from "@/lib/types";
 import { dollars, sellApi, toCents } from "./api";
+import { PhoneNotifications } from "./PhoneNotifications";
 import { ReceiptsSetup } from "./ReceiptsSetup";
 
 type Setup = {
@@ -164,6 +165,8 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
           {busy ? "Saving…" : "Save"}
         </button>
       </form>
+
+      <PhoneNotifications />
 
       {setup.bch && setup.cashTokens && <ReceiptsSetup hotWallet={setup.hotWallet} />}
 

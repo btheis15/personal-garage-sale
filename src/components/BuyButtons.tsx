@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { availability } from "@/lib/availability";
 import type { PublicItem } from "@/lib/types";
 import { cart, useCart } from "./cart/store";
+import { useMyOrders } from "./myOrders";
 
 const subscribeNow = (cb: () => void) => {
   const t = setInterval(cb, 30_000);
@@ -18,8 +20,19 @@ export function BuyButtons({ item }: { item: PublicItem }) {
   const now = useSyncExternalStore(subscribeNow, () => Math.floor(Date.now() / 30_000), () => 0);
   const state = now ? availability(item, now * 30_000) : availability(item);
   const inCart = items.some((i) => i.id === item.id);
+  // Held by this buyer (on this device): a way back to their order, to see the pickup details or cancel.
+  const mine = useMyOrders().find((o) => o.itemIds.includes(item.id));
 
   if (state === "sold") return <p className="rounded-lg bg-kraft px-4 py-3 text-center font-bold">Sold, sorry! Have a look at what else is for sale.</p>;
+  if (mine)
+    return (
+      <div className="rounded-lg bg-leaf-light px-4 py-3 text-center">
+        <p className="font-semibold text-leaf">{mine.status === "reserved" ? "It's on hold for you." : "You're in the middle of paying for this."}</p>
+        <Link href={`/order/${mine.id}`} className="btn btn-primary mt-3 w-full">
+          {mine.status === "reserved" ? "See your hold (or cancel it)" : "Back to your order"}
+        </Link>
+      </div>
+    );
   if (state === "on_hold")
     return (
       <p className="rounded-lg bg-tag-light px-4 py-3 text-center font-semibold text-tag">
