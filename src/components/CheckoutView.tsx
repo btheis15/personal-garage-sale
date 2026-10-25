@@ -177,10 +177,15 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
               <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-kraft">
                 <ItemPhoto url={i.photo} alt="" sizes="56px" />
               </div>
-              <p className="min-w-0 flex-1 text-sm leading-snug">
-                {i.qty > 1 && `${i.qty} × `}
-                {i.title}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm leading-snug">
+                  {i.qty > 1 && `${i.qty} × `}
+                  {i.title}
+                </p>
+                <button type="button" onClick={() => cart.remove(i.id)} disabled={busy} className="text-xs text-muted underline underline-offset-4" aria-label={`Remove ${i.title}`}>
+                  Remove
+                </button>
+              </div>
               <p className="font-bold">{money(i.priceCents * i.qty)}</p>
             </li>
           ))}

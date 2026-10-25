@@ -244,6 +244,21 @@ export function ownerReservedEmail({ order: o, shop, siteUrl, until }) {
   return { subject: `On hold for pickup: ${titles(o)} (${moneyText(o.totalCents)})`, text, html };
 }
 
+/** Brian's note that a buyer cancelled their hold: it's back in the shop. */
+export function ownerCancelledEmail({ order: o, shop, siteUrl }) {
+  const { text, html } = layout({
+    shop,
+    siteUrl,
+    preheader: `${titles(o)} is back in the shop.`,
+    tag: `Order #${o.number} · Cancelled`,
+    heading: "Hold cancelled",
+    intro: `${o.customer?.name || "The buyer"} cancelled their hold on ${itemCount(o) > 1 ? `${itemCount(o)} things` : titles(o)}. ${itemCount(o) > 1 ? "They're" : "It's"} back in the shop for someone else.`,
+    blocks: [itemsBlock(o, siteUrl), buyerBlock(o), ...(siteUrl ? [button("Open it in the Sell app", `${siteUrl}/sell/orders/${o.id}`)] : [])],
+    footer: "Sent by your garage sale's Mac mini.",
+  });
+  return { subject: `Hold cancelled: ${titles(o)} (${moneyText(o.totalCents)})`, text, html };
+}
+
 /** npm run email-preview -- --send <address>: checks the email account works. */
 export function testEmail({ shop, siteUrl }) {
   const { text, html } = layout({

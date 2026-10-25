@@ -134,6 +134,18 @@ create table if not exists commissions (
   sent_at text
 );
 create index if not exists commissions_partner_idx on commissions (partner_id, created_at);
+
+-- Phones that get the Sell app's notifications (src/push.js), and its keys.
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  data text not null,
+  label text not null default '',
+  created_at text not null
+);
+create table if not exists meta (
+  name text primary key,
+  value text not null
+);
 `;
 
 // Columns added after the first version (SQLite has no "add column if not exists").

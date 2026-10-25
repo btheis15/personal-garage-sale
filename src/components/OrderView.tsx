@@ -14,6 +14,7 @@ import { createBchWalletConnect } from "./bch/walletConnect";
 import { cart } from "./cart/store";
 import { DoneTick } from "./motion/DoneTick";
 import { ItemPhoto } from "./ItemPhoto";
+import { myOrders } from "./myOrders";
 
 type Shop = { name: string; pickupInstructions: string; pickupArea: string; venmo: string; contactEmail: string; contactPhone: string };
 
@@ -82,9 +83,13 @@ export function OrderView({
   );
 
   const paid = order.status === "paid" || order.status === "completed";
+  // Bought or held: those items come out of the cart (anything else in it stays).
+  const itemIds = order.items.map((i) => i.id).join(",");
   useEffect(() => {
-    if (paid || order.status === "reserved") cart.clear();
-  }, [paid, order.status]);
+    if (paid || order.status === "reserved") cart.removeMany(itemIds.split(","));
+  }, [paid, order.status, itemIds]);
+  // Remembered on this device while it's open, so the buyer can find their way back (and cancel).
+  useEffect(() => myOrders.track(order), [order]);
 
   // Back from Stripe before its notice arrived: look again every few seconds.
   const refresh = useCallback(async () => {
@@ -116,8 +121,11 @@ export function OrderView({
     setBusy(null);
   }
 
+  // Asked on the page itself, not with confirm(): Facebook's and Instagram's in-app browsers can swallow
+  // confirm(), and Cancel then did nothing.
+  const [confirming, setConfirming] = useState(false);
   async function cancel() {
-    if (!confirm("Cancel this order? The items go back in the shop.")) return;
+    setConfirming(false);
     setBusy("cancel");
     setError(null);
     const res = await fetch(`/api/orders/${order.id}/cancel`, { method: "POST" });
@@ -258,11 +266,26 @@ export function OrderView({
       )}
 
       {(order.status === "reserved" || (order.status === "pending" && order.channel === "web")) && (
-        <p className="mt-6 text-center">
-          <button type="button" onClick={cancel} disabled={busy !== null} className="text-sm text-muted underline underline-offset-4">
-            {busy === "cancel" ? "Cancelling…" : "Cancel this order"}
-          </button>
-        </p>
+        <div className="mt-6 text-center">
+          {confirming ? (
+            <div className="animate-rise mx-auto max-w-sm rounded-lg border border-line bg-white p-4">
+              <p className="font-bold">{order.status === "reserved" ? "Cancel your hold?" : "Cancel this order?"}</p>
+              <p className="mt-1 text-sm text-muted">{order.items.length > 1 ? "The items go" : "It goes"} back in the shop for someone else.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setConfirming(false)} className="btn btn-outline">
+                  Keep it
+                </button>
+                <button type="button" onClick={cancel} className="btn btn-primary">
+                  Yes, cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirming(true)} disabled={busy !== null} className="text-sm text-muted underline underline-offset-4">
+              {busy === "cancel" ? "Cancelling…" : order.status === "reserved" ? "Cancel my hold" : "Cancel this order"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
