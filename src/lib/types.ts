@@ -38,6 +38,11 @@ export type Item = {
   pickup: boolean;
   ships: boolean;
   shippingCents: number | null;
+  /** Packed weight and box, for live shipping prices (optional; Sell app only). */
+  weightOz?: number | null;
+  boxLengthIn?: number | null;
+  boxWidthIn?: number | null;
+  boxHeightIn?: number | null;
   featured: boolean;
   channels: Channels;
   notes: string;
@@ -55,6 +60,20 @@ export type PublicItem = Omit<Item, "notes">;
 export type Availability = "available" | "on_hold" | "sold";
 
 export type OrderStatus = "pending" | "reserved" | "paid" | "completed" | "cancelled" | "expired";
+export type ShipAddress = { line1: string; line2?: string; city: string; state: string; postal_code: string };
+/** A Shippo price, as the Sell app shows it. */
+export type LabelRate = { id: string; label: string; cents: number; days: number | null; provider: string };
+/** Where the order's shipping label stands (Sell app only). */
+export type OrderLabel = {
+  state: "none" | "rates" | "buying" | "uncertain" | "bought";
+  auto?: boolean;
+  rates?: LabelRate[];
+  chosen?: LabelRate;
+  labelUrl?: string;
+  test?: boolean;
+  error?: string | null;
+  messages?: string[];
+};
 export type PayMethod = "stripe" | "bch" | "cash" | "venmo" | "other";
 
 export type OrderLine = { id: string; slug?: string; title: string; priceCents: number; qty: number; photo?: string | null };
@@ -107,6 +126,16 @@ export type Order = {
   totalCents: number;
   fulfillment: "pickup" | "ship";
   customer: Customer;
+  /** The address the buyer gave the website, with live shipping prices. */
+  shipTo?: ShipAddress | null;
+  label?: OrderLabel | null;
+  trackingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  /** When Brian marked it shipped. */
+  shippedAt?: string | null;
+  /** Something that needs Brian's hand (e.g. the label couldn't be bought automatically). */
+  problem?: string | null;
   stripeSessionId: string | null;
   holdUntil: string | null;
   paidAt: string | null;
@@ -139,6 +168,11 @@ export type SiteSettings = {
   announcement: string;
   /** A line printed on Bitcoin Cash receipts (CashTokens). */
   receiptNote?: string;
+  /** Live Shippo prices and automatic labels (needs the Shippo key on the Mac mini and a complete ship-from). */
+  liveShipping?: boolean;
+  shipFrom?: { name: string; street1: string; street2: string; city: string; state: string; zip: string; phone: string; email: string };
+  /** The usual box, for items without their own weight or box. */
+  package?: { lengthIn: number; widthIn: number; heightIn: number; weightOz: number };
   /** "Spread the word": friends share the sale and earn a commission on Bitcoin Cash sales. */
   partners?: { enabled: boolean; ratePercent: number; taxFormOver: number };
 };

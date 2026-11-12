@@ -15,6 +15,7 @@ type Status = {
   hotWallet: boolean;
   receipts: boolean;
   email: boolean;
+  shippo?: { mode: "test" | "live"; connected: boolean } | null;
   publicUrl: string | null;
   website: { state: string; message: string };
 };
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
         receipts: Boolean(status?.receipts),
         walletConnect: Boolean(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID),
         email: Boolean(status?.email),
+        shippo: status?.shippo ?? null,
         publicUrl: status?.publicUrl ?? null,
         website: status?.website ?? null,
         siteUrl: siteUrl(),

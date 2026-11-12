@@ -142,6 +142,15 @@ create table if not exists push_subscriptions (
   label text not null default '',
   created_at text not null
 );
+-- Live Shippo prices a buyer was shown (src/shipping.js): held ~30 minutes, tied to the cart and address.
+create table if not exists shipping_quotes (
+  id text primary key,
+  mode text not null,
+  fingerprint text not null,
+  data text not null,
+  created_at text not null,
+  expires_at text not null
+);
 create table if not exists meta (
   name text primary key,
   value text not null
@@ -152,6 +161,19 @@ create table if not exists meta (
 const LATER_COLUMNS = [
   ["orders", "partner_id", "text"],
   ["orders", "receipt_pref", "text"],
+  // Live shipping: where it goes, the label's state (JSON), tracking, when it was marked shipped, and a visible problem note.
+  ["orders", "ship_to", "text"],
+  ["orders", "label", "text"],
+  ["orders", "tracking_carrier", "text"],
+  ["orders", "tracking_number", "text"],
+  ["orders", "tracking_url", "text"],
+  ["orders", "shipped_at", "text"],
+  ["orders", "problem", "text"],
+  // Per item: packed weight and box, for live shipping prices (all optional).
+  ["items", "weight_oz", "real"],
+  ["items", "box_length_in", "real"],
+  ["items", "box_width_in", "real"],
+  ["items", "box_height_in", "real"],
 ];
 
 export function openDb(file = ":memory:") {

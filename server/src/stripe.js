@@ -6,6 +6,8 @@
  */
 import Stripe from "stripe";
 
+const stripeAddress = (a) => ({ line1: a.line1, ...(a.line2 ? { line2: a.line2 } : {}), city: a.city, state: a.state, postal_code: a.postal_code, country: "US" });
+
 export function createStripe({ config, store, notifier, makeClient = (key) => new Stripe(key) }) {
   const key = config.stripeSecretKey;
   const enabled = /^(sk|rk)_(test|live)_/.test(key);
@@ -17,6 +19,16 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
     if (!client) throw Object.assign(new Error("Card payments aren't set up yet."), { status: 400 });
     const s = store.getSettings();
     const base = config.siteUrl;
+    // A live Shippo price the buyer chose on the website: Stripe gets their address (through a Customer, so its page asks for none)
+    // and one fixed shipping option with that exact price.
+    const live = order.fulfillment === "ship" && order.shipTo && order.label?.auto ? order.label.rates?.[0] : null;
+    const phone = String(order.customer.phone ?? "").replace(/[^\d+]/g, "").slice(0, 20) || undefined;
+    const stripeCustomer = live
+      ? await client.customers.create(
+          { name: order.customer.name, email: order.customer.email, phone, address: stripeAddress(order.shipTo), shipping: { name: order.customer.name || "Customer", phone, address: stripeAddress(order.shipTo) }, metadata: { order_id: order.id, order_number: String(order.number) } },
+          { idempotencyKey: `customer-${order.id}` },
+        )
+      : null;
     const image = (photo) => (photo && base ? `${base}${photo}` : null);
     const session = await client.checkout.sessions.create({
       ui_mode: "hosted_page",
@@ -36,10 +48,17 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
           quantity: i.qty,
           price_data: { currency: "usd", unit_amount: i.priceCents, product_data: { name: i.title.slice(0, 250), ...(image(i.photo) ? { images: [image(i.photo)] } : {}) } },
         })),
-        ...(order.shippingCents ? [{ quantity: 1, price_data: { currency: "usd", unit_amount: order.shippingCents, product_data: { name: "Shipping" } } }] : []),
+        ...(order.shippingCents && !live ? [{ quantity: 1, price_data: { currency: "usd", unit_amount: order.shippingCents, product_data: { name: "Shipping" } } }] : []),
       ],
-      ...(order.customer.email ? { customer_email: order.customer.email } : {}),
-      ...(order.fulfillment === "ship" ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
+      ...(live
+        ? {
+            customer: stripeCustomer.id,
+            shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: live.label, fixed_amount: { amount: live.cents, currency: "usd" } } }],
+          }
+        : {
+            ...(order.customer.email ? { customer_email: order.customer.email } : {}),
+            ...(order.fulfillment === "ship" ? { shipping_address_collection: { allowed_countries: ["US"] } } : {}),
+          }),
       phone_number_collection: { enabled: order.channel === "web" && !order.customer.phone },
       // Stripe's shortest is 30 minutes; the items are held a little longer.
       expires_at: Math.floor(Date.now() / 1000) + 31 * 60,

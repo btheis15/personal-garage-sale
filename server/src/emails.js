@@ -107,7 +107,7 @@ ${body.map((l) => `<p style="font-family:${SANS};font-size:15px;line-height:1.55
 /** The buyer's details, for Brian's own copy. */
 function buyerBlock(o) {
   const c = o.customer ?? {};
-  const a = c.address;
+  const a = o.shipTo ?? c.address;
   return signBlock("Buyer", [
     c.name || (o.channel === "in_person" ? "In person" : "No name given"),
     c.email,
@@ -257,6 +257,55 @@ export function ownerCancelledEmail({ order: o, shop, siteUrl }) {
     footer: "Sent by your garage sale's Mac mini.",
   });
   return { subject: `Hold cancelled: ${titles(o)} (${moneyText(o.totalCents)})`, text, html };
+}
+
+const trackingLines = (o) => [o.trackingCarrier ? `Carrier: ${o.trackingCarrier.toUpperCase()}` : null, `Tracking number: ${o.trackingNumber}`, o.trackingUrl ? `Track it: ${o.trackingUrl}` : null];
+
+/** The buyer's tracking number, as soon as the label is made (before it's dropped off). */
+export function buyerTrackingEmail({ order: o, shop, siteUrl }) {
+  const name = firstName(o);
+  const { text, html } = layout({
+    shop,
+    siteUrl,
+    preheader: `Your tracking number for order #${o.number}.`,
+    tag: `Order #${o.number} · Label made`,
+    heading: `Your tracking number${name ? `, ${name}` : ""}`,
+    intro: `I've made the shipping label for ${itemCount(o) > 1 ? "your order" : titles(o)}. It goes out soon, and the tracking will update once the carrier has it.`,
+    blocks: [signBlock("Tracking", trackingLines(o)), ...(o.trackingUrl ? [button("Track your package", o.trackingUrl)] : []), itemsBlock(o, siteUrl)],
+    footer: buyerFooter(shop),
+  });
+  return { subject: `Tracking for order #${o.number} from ${shop.name}`, text, html };
+}
+
+/** The buyer's "it's on its way", when Brian marks the order shipped. */
+export function buyerShippedEmail({ order: o, shop, siteUrl }) {
+  const name = firstName(o);
+  const { text, html } = layout({
+    shop,
+    siteUrl,
+    preheader: `Order #${o.number} is on its way.`,
+    tag: `Order #${o.number} · Shipped`,
+    heading: `It's on its way${name ? `, ${name}` : ""}!`,
+    intro: `${itemCount(o) > 1 ? "Your order has" : `${titles(o)} has`} shipped.${o.trackingNumber ? " Here's the tracking." : ""}`,
+    blocks: [...(o.trackingNumber ? [signBlock("Tracking", trackingLines(o))] : []), ...(o.trackingUrl ? [button("Track your package", o.trackingUrl)] : []), itemsBlock(o, siteUrl)],
+    footer: buyerFooter(shop),
+  });
+  return { subject: `Shipped: order #${o.number} from ${shop.name}`, text, html };
+}
+
+/** Brian's note that something needs his hand (a label that couldn't be bought automatically). */
+export function ownerProblemEmail({ order: o, shop, siteUrl, message }) {
+  const { text, html } = layout({
+    shop,
+    siteUrl,
+    preheader: message,
+    tag: `Order #${o.number} · Needs a look`,
+    heading: "Shipping label needs you",
+    intro: message,
+    blocks: [itemsBlock(o, siteUrl), buyerBlock(o), ...(siteUrl ? [button("Open it in the Sell app", `${siteUrl}/sell/orders/${o.id}`)] : [])],
+    footer: "Sent by your garage sale's Mac mini.",
+  });
+  return { subject: `Needs a look: label for order #${o.number}`, text, html };
 }
 
 /** npm run email-preview -- --send <address>: checks the email account works. */

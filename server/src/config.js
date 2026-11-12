@@ -33,6 +33,9 @@ export function loadConfig(overrides = {}) {
     revalidateSecret: env.REVALIDATE_SECRET || "",
     stripeSecretKey: (env.STRIPE_SECRET_KEY || "").trim(),
     stripeWebhookSecret: (env.STRIPE_WEBHOOK_SECRET || "").trim(),
+    // Shippo (live shipping prices and labels). The test key is used whenever Stripe is in test mode, the live key only when it's live.
+    shippoLiveKey: (env.SHIPPO_API_KEY || "").trim(),
+    shippoTestKey: (env.SHIPPO_TEST_KEY || "").trim(),
     bchXpub: (env.BCH_XPUB || "").trim(),
     // The small hot wallet (npm run new-hot-wallet): mints receipts as CashTokens and pays partners' commissions.
     bchHotWalletWif: (env.BCH_HOT_WALLET_WIF || "").trim(),

@@ -56,6 +56,8 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
   const [pickup, setPickup] = useState(item?.pickup ?? true);
   const [ships, setShips] = useState(item?.ships ?? false);
   const [shipping, setShipping] = useState(dollars(item?.shippingCents));
+  const [weightOz, setWeightOz] = useState(item?.weightOz ? String(item.weightOz) : "");
+  const [box, setBox] = useState<[string, string, string]>([item?.boxLengthIn, item?.boxWidthIn, item?.boxHeightIn].map((v) => (v ? String(v) : "")) as [string, string, string]);
   const [featured, setFeatured] = useState(item?.featured ?? false);
   const [notes, setNotes] = useState(item?.notes ?? "");
   const [more, setMore] = useState(false);
@@ -143,6 +145,11 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
       pickup,
       ships,
       shippingCents: ships ? toCents(shipping) : null,
+      // Packing details for live shipping prices; blank: the usual package (Settings).
+      weightOz: ships && weightOz.trim() ? Number(weightOz) : null,
+      boxLengthIn: ships && box[0].trim() ? Number(box[0]) : null,
+      boxWidthIn: ships && box[1].trim() ? Number(box[1]) : null,
+      boxHeightIn: ships && box[2].trim() ? Number(box[2]) : null,
       featured,
       notes,
     };
@@ -189,6 +196,8 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
     setWasPrice("");
     setShips(false);
     setShipping("");
+    setWeightOz("");
+    setBox(["", "", ""]);
     setFeatured(false);
     setNotes("");
     setPosted(null);
@@ -433,6 +442,23 @@ export function ItemEditor({ item, shippingOn, defaultShippingCents, shopName }:
                     <span className="eyebrow">Shipping price</span>
                     <input inputMode="decimal" placeholder={`$${dollars(defaultShippingCents)} (the default)`} value={shipping} onChange={(e) => setShipping(e.target.value)} className="field mt-1" />
                   </label>
+                )}
+                {ships && (
+                  <div className="space-y-2">
+                    <label className="block">
+                      <span className="eyebrow">Packed weight (oz, optional)</span>
+                      <input inputMode="decimal" placeholder="Usual package" value={weightOz} onChange={(e) => setWeightOz(e.target.value)} className="field mt-1" />
+                    </label>
+                    <div>
+                      <span className="eyebrow">Box (inches, optional)</span>
+                      <div className="mt-1 grid grid-cols-3 gap-2">
+                        {(["Length", "Width", "Height"] as const).map((label, n) => (
+                          <input key={label} inputMode="decimal" aria-label={label} placeholder={label} value={box[n]} onChange={(e) => setBox((b) => b.map((v, i) => (i === n ? e.target.value : v)) as [string, string, string])} className="field" />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted">Used for live shipping prices. Blank means the usual package in Settings.</p>
+                  </div>
                 )}
               </>
             ) : (
