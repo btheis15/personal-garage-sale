@@ -109,9 +109,23 @@ All in `server/.env`, then `launchctl kickstart -k gui/$(id -u)/com.garagesale.s
 1. Stripe → Developers → API keys → `STRIPE_SECRET_KEY` (`sk_test_…` first).
 2. Stripe → Developers → Webhooks → Add destination → `<PUBLIC_URL>/stripe/webhook`, events
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-   `checkout.session.async_payment_failed`, `checkout.session.expired`. Its signing secret →
-   `STRIPE_WEBHOOK_SECRET`.
+   `checkout.session.async_payment_failed`, `checkout.session.expired`, and (for Apple Pay / Google Pay)
+   `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`. Its signing
+   secret → `STRIPE_WEBHOOK_SECRET`.
 3. Buy something with `4242 4242 4242 4242`. Then the same with the live key.
+
+**Apple Pay / Google Pay on the checkout page (optional, needs live shipping on)**
+1. Stripe → Developers → API keys → Publishable key → `STRIPE_PUBLISHABLE_KEY`. It must be the same mode as
+   the secret key (`pk_test_…` with `sk_test_…`), or the buttons stay off. Sell → Settings → Setup says which.
+2. `cd server && npm run apple-pay-domain` registers the website's address with Stripe for Apple Pay (add
+   `-- --live` only with a live key). Nothing to host: Stripe checks the domain itself.
+3. `npm run card-only-config` prints `STRIPE_CARD_ONLY_CONFIG=pmc_…`: add it so Stripe's own page shows the
+   card form only (the wallets are above it on the website). Without it, only Link is hidden there.
+4. Restart. The website offers the buttons only when the feed says Stripe, live shipping and the key all agree.
+
+**If you use a restricted key (`rk_…`)**, Stripe → Developers → API keys → Create restricted key, Write on:
+Checkout Sessions, Customers, Coupons (coupon codes), PaymentIntents (Apple Pay / Google Pay), and only for the
+two one-time scripts: Payment method domains and Payment method configurations. Read on Events is not needed.
 
 **Bitcoin Cash**
 1. A wallet just for this in Selene (Settings → Wallet → xPub) or Electron Cash

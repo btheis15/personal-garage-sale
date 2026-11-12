@@ -77,6 +77,7 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
           ))}
         </div>
       ) : null}
+      {order.problem && <p className="mb-4 rounded-2xl bg-berry/10 p-4 text-sm font-bold text-berry">{order.problem}</p>}
       {order.notes.includes("Paid after the hold ran out") && <p className="mb-4 rounded-2xl bg-sun/50 p-4 text-sm font-bold">Paid after its hold ran out: check the items weren&apos;t sold to someone else meanwhile.</p>}
 
       <ul className="divide-y divide-line rounded-2xl border border-line bg-white">
@@ -92,6 +93,12 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
             <p className="font-bold">{money(i.priceCents * i.qty)}</p>
           </li>
         ))}
+        {order.discountCents > 0 && (
+          <li className="flex justify-between p-3 text-leaf">
+            <span>Coupon{order.coupon ? ` (${order.coupon})` : ""}</span>
+            <span>−{money(order.discountCents)}</span>
+          </li>
+        )}
         {order.shippingCents > 0 && (
           <li className="flex justify-between p-3">
             <span>Shipping</span>
@@ -112,7 +119,7 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
         {c.name && <Row k="Name" v={c.name} />}
         {c.email && <Row k="Email" v={<a href={`mailto:${c.email}?subject=${encodeURIComponent(`Your order #${order.number}`)}`} className="font-bold text-tag-dark underline">{c.email}</a>} />}
         {c.phone && <Row k="Phone" v={<a href={`sms:${c.phone.replace(/[^\d+]/g, "")}`} className="font-bold text-tag-dark underline">{c.phone}</a>} />}
-        {a && <Row k="Ship to" v={[a.line1, a.line2, [a.city, a.state, a.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ")} />}
+        {(order.shipTo ?? a) && <Row k="Ship to" v={[(order.shipTo ?? a)!.line1, (order.shipTo ?? a)!.line2, [(order.shipTo ?? a)!.city, (order.shipTo ?? a)!.state, (order.shipTo ?? a)!.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ")} />}
         {c.note && <Row k="Their note" v={c.note} />}
         {bch && <Row k="BCH address" v={<span className="break-all">{bch.address}</span>} />}
         {bch?.receipt?.state && <Row k="Wallet receipt" v={RECEIPT_STATE[bch.receipt.state] ?? bch.receipt.state} />}
@@ -135,6 +142,8 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
           />
         )}
       </dl>
+
+      {order.fulfillment === "ship" && (order.status === "paid" || order.status === "completed") && <LabelPanel order={order} onOrder={setOrder} />}
 
       {error && <p className="mt-4 rounded-xl bg-berry/10 p-3 text-sm font-bold text-berry">{error}</p>}
 
@@ -186,6 +195,105 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
         </details>
       )}
     </div>
+  );
+}
+
+/** The shipping label: status, tracking, print, buy or retry, and Mark shipped (which emails the buyer). */
+function LabelPanel({ order, onOrder }: { order: Order; onOrder: (o: Order) => void }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [carrier, setCarrier] = useState("");
+  const [tracking, setTracking] = useState("");
+  const label = order.label ?? { state: "none" as const };
+  const bought = label.state === "bought";
+  const stuck = label.state === "uncertain" || label.state === "buying";
+
+  async function run(key: string, path: string, body: unknown = {}) {
+    setBusy(key);
+    setError(null);
+    try {
+      const { order: next } = await sellApi<{ order: Order }>("POST", `/api/sell/orders/${order.id}/${path}`, body);
+      onOrder(next);
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      router.refresh();
+    }
+    setBusy(null);
+  }
+
+  return (
+    <section className="mt-4 space-y-3 rounded-2xl border border-line bg-white p-4 text-sm">
+      <p className="eyebrow">Shipping label</p>
+      {bought ? (
+        <div className="space-y-2">
+          <p>
+            <b>Label made</b>
+            {label.chosen ? `: ${label.chosen.label}, ${money(label.chosen.cents)}` : ""}
+            {label.test ? " (test label, not real postage)" : ""}.
+          </p>
+          {order.trackingNumber && (
+            <p>
+              Tracking:{" "}
+              {order.trackingUrl ? (
+                <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-tag-dark underline">
+                  {order.trackingNumber} ↗
+                </a>
+              ) : (
+                <b>{order.trackingNumber}</b>
+              )}
+            </p>
+          )}
+          {label.labelUrl && (
+            <a href={label.labelUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full">
+              Print label
+            </a>
+          )}
+        </div>
+      ) : stuck ? (
+        <>
+          <p>Buying the label didn&apos;t get an answer from Shippo. Check before buying another, so you don&apos;t pay twice.</p>
+          <button type="button" className="btn btn-primary w-full" disabled={busy !== null} onClick={() => run("check", "label/check")}>
+            {busy === "check" ? "Checking…" : "Check label"}
+          </button>
+        </>
+      ) : order.shippedAt ? (
+        <p>No label was made here.</p>
+      ) : (
+        <>
+          <p className="text-muted">{label.state === "rates" && label.rates?.length ? "Pick a price to buy the label:" : "No label yet."}</p>
+          {label.state === "rates" && label.rates?.map((r) => (
+            <button key={r.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left" disabled={busy !== null} onClick={() => run(r.id, "label/buy", { rateId: r.id })}>
+              <span>
+                <b>{r.label}</b>
+                {r.days ? <span className="block text-muted">about {r.days} day{r.days > 1 ? "s" : ""}</span> : null}
+              </span>
+              <span className="font-bold">{busy === r.id ? "…" : `Buy ${money(r.cents)}`}</span>
+            </button>
+          ))}
+          <button type="button" className="btn btn-outline w-full" disabled={busy !== null} onClick={() => run("rates", "label/rates")}>
+            {busy === "rates" ? "Getting prices…" : label.state === "rates" && label.rates?.length ? "Get fresh prices" : "Get rates"}
+          </button>
+        </>
+      )}
+      {error && <p className="rounded-xl bg-berry/10 p-3 font-bold text-berry">{error}</p>}
+      {order.shippedAt ? (
+        <p className="font-bold text-leaf">Marked shipped {ago(order.shippedAt)}. The buyer was emailed.</p>
+      ) : (
+        <div className="space-y-2 border-t border-line pt-3">
+          {!order.trackingNumber && (
+            <div className="grid grid-cols-2 gap-2">
+              <input aria-label="Carrier" placeholder="Carrier (optional)" value={carrier} onChange={(e) => setCarrier(e.target.value)} className="field" />
+              <input aria-label="Tracking number" placeholder="Tracking # (optional)" value={tracking} onChange={(e) => setTracking(e.target.value)} className="field" />
+            </div>
+          )}
+          <button type="button" className="btn btn-primary w-full" disabled={busy !== null || stuck} onClick={() => run("shipped", "shipped", { carrier, trackingNumber: tracking })}>
+            {busy === "shipped" ? "…" : "Mark shipped (emails the buyer)"}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

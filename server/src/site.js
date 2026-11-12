@@ -13,6 +13,12 @@ export const DEFAULT_SETTINGS = {
   venmo: "",
   shipping: false,
   defaultShippingCents: 1000,
+  // Live Shippo prices + automatic labels (Sell → Settings). Off: the flat per-item/default shipping applies, as before.
+  liveShipping: false,
+  // Where parcels come from. Phone and email are required for live prices: USPS won't make a label without them.
+  shipFrom: { name: "", street1: "", street2: "", city: "", state: "", zip: "", phone: "", email: "" },
+  // The usual box, used for items without their own weight or box.
+  package: { lengthIn: 12, widthIn: 9, heightIn: 4, weightOz: 16 },
   announcement: "",
   // Bitcoin Cash receipts as CashTokens: offered at checkout once the collection is made (Settings).
   receiptNote: "Thanks for stopping by!",

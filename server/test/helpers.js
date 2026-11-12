@@ -7,24 +7,28 @@ import { loadConfig } from "../src/config.js";
 import { openDb } from "../src/db.js";
 import { createSanctionsList } from "../src/bch.js";
 import { createPartners } from "../src/partners.js";
+import { createExpress } from "../src/express.js";
+import { createShipping } from "../src/shipping.js";
 import { createStore } from "../src/store.js";
 
 export const SITE = "s".repeat(40);
 export const ADMIN = "a".repeat(40);
 
 /** A whole server on a free port, with stand-ins for Stripe, Bitcoin Cash and email. */
-export async function startServer({ stripe = fakeStripe(), bch = { enabled: false }, sanctionsFetch = null } = {}) {
+export async function startServer({ stripe = fakeStripe(), bch = { enabled: false }, sanctionsFetch = null, configOverrides = {}, makeShippo = undefined } = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "gs-test-"));
-  const config = loadConfig({ dataDir: dir, siteToken: SITE, adminToken: ADMIN, siteUrl: "https://shop.test" });
+  const config = loadConfig({ dataDir: dir, siteToken: SITE, adminToken: ADMIN, siteUrl: "https://shop.test", ...configOverrides });
   const db = openDb(":memory:");
   const sent = [];
-  const notifier = { enabled: true, paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]), cancelled: (o) => sent.push(["cancelled", o.number]) };
+  const notifier = { enabled: true, tracking: (o) => sent.push(["tracking", o.number, o.trackingNumber]), shipped: (o) => sent.push(["shipped", o.number]), problem: (o, m) => sent.push(["problem", o.number, m]), paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]), cancelled: (o) => sent.push(["cancelled", o.number]) };
   const store = createStore(db);
-  const s = typeof stripe === "function" ? stripe(store) : stripe;
+  const s = typeof stripe === "function" ? stripe(store, { config, notifier }) : stripe;
   const sanctions = createSanctionsList(db, sanctionsFetch ? { fetchImpl: sanctionsFetch } : {});
   const partners = createPartners({ db, store, config, isBlocked: sanctions.isBlocked });
   const b = typeof bch === "function" ? bch(store, db, { partners, sanctions, notifier }) : bch;
-  const app = createApp({ config, store, stripe: s, bch: b, notifier, partners, sanctions, revalidator: { status: () => ({ state: "idle" }) } });
+  const shipping = createShipping({ config, db, store, notifier, stripeMode: () => (s.enabled ? (s.testMode ? "test" : "live") : null), ...(makeShippo ? { makeShippo } : {}) });
+  const express = createExpress({ store, stripe: s, shipping });
+  const app = createApp({ config, store, stripe: s, bch: b, notifier, partners, sanctions, shipping, expressPay: express, revalidator: { status: () => ({ state: "idle" }) } });
   const server = await new Promise((resolve) => {
     const srv = app.listen(0, "127.0.0.1", () => resolve(srv));
   });
@@ -44,6 +48,7 @@ export async function startServer({ stripe = fakeStripe(), bch = { enabled: fals
     sent,
     partners,
     sanctions,
+    shipping,
     config,
     site: call(SITE),
     admin: call(ADMIN),

@@ -11,7 +11,9 @@ import { createPartners } from "./partners.js";
 import { createPush } from "./push.js";
 import { createRevalidator } from "./revalidate.js";
 import { createStore } from "./store.js";
+import { createShipping } from "./shipping.js";
 import { createStripe } from "./stripe.js";
+import { createExpress } from "./express.js";
 
 const config = loadConfig();
 assertProductionReady(config);
@@ -21,6 +23,9 @@ const store = createStore(db, { onChange: () => revalidator.schedule() });
 const push = createPush({ db, config });
 const notifier = createNotifier({ config, store, push });
 const stripe = createStripe({ config, store, notifier });
+// Live Shippo prices and automatic labels (off until Sell → Settings turns them on).
+const shipping = createShipping({ config, db, store, notifier, stripeMode: () => (stripe.enabled ? (stripe.testMode ? "test" : "live") : null) });
+const express = createExpress({ store, stripe, shipping });
 // The US sanctions list (partners' payout addresses), and "Spread the word".
 const sanctions = createSanctionsList(db);
 const partners = createPartners({ db, store, config, isBlocked: sanctions.isBlocked });
@@ -32,7 +37,7 @@ if (bch.enabled && bch.hotWallet) sanctions.refresh().catch(() => {});
 const expiry = setInterval(() => store.expireStale(), 60_000);
 if (bch.enabled) bch.run();
 
-const server = createApp({ config, store, stripe, bch, notifier, revalidator, partners, sanctions, push }).listen(config.port, config.host, () => {
+const server = createApp({ config, store, stripe, bch, notifier, revalidator, partners, sanctions, push, shipping, expressPay: express }).listen(config.port, config.host, () => {
   console.log(`[garage-sale] listening on http://${config.host}:${config.port}`);
   if (bch.enabled) console.log(`[garage-sale] CashTokens (wallet receipts, Spread the word): ${!bch.cashTokens ? "off (BCH_CASHTOKENS)" : bch.hotWallet ? "on" : "on, but no hot wallet (BCH_HOT_WALLET_WIF)"}`);
   console.log(`[garage-sale] Stripe: ${stripe.enabled ? (stripe.testMode ? "test mode" : "live") : "off (STRIPE_SECRET_KEY)"} · Bitcoin Cash: ${bch.enabled ? `on, first address ${bch.firstAddress()}` : "off (BCH_XPUB)"} · emails: ${notifier.enabled ? "on" : "off (SMTP_USER/SMTP_PASS)"} · phones for notifications: ${push.count()}`);

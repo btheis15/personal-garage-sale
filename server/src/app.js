@@ -4,11 +4,14 @@
  * Anyone:
  *   GET  /health                 uptime checks
  *   GET  /media/<id>/<w>.webp     photos (the website shows them through its own address)
- *   POST /stripe/webhook          Stripe's signed "paid" / "expired" notices
+ *   POST /stripe/webhook          Stripe's signed "paid" / "failed" / "expired" notices (Checkout Sessions and PaymentIntents)
  *
  * The website (Authorization: Bearer SHOP_API_TOKEN):
  *   GET  /api/catalog             items for sale (+ recently sold), settings, which payments are on
  *   GET  /api/item/:slug          one item, sold ones too
+ *   POST /api/shipping-rates      live Shippo prices for a cart + address (when Settings → live shipping is on)
+ *   POST /api/coupon              what a typed coupon code would take off the cart
+ *   POST /api/express/rates · /order  Apple Pay / Google Pay: prices for the wallet's address, then the order + PaymentIntent
  *   POST /api/checkout            holds the items and starts the payment
  *   GET  /api/orders/:id          the buyer's order page;  POST …/pay, …/cancel, …/stripe-return
  *   POST /api/orders/:id/bch/start · GET …/bch · POST …/bch/:action   Bitcoin Cash
@@ -24,6 +27,7 @@ import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import multer from "multer";
 import { deleteImages, MediaError, saveImage } from "./media.js";
+import { anyActive, checkCoupon, publicSettings } from "./coupons.js";
 import { CHECKOUT_HOLD_MINUTES, IN_PERSON_HOLD_MINUTES } from "./site.js";
 import { buyerView, ShopError } from "./store.js";
 
@@ -47,7 +51,7 @@ function readCustomer(v) {
 }
 const readLines = (v) => (Array.isArray(v) ? v : []).slice(0, 50).map((l) => ({ id: str(l?.id, 40), qty: Number(l?.qty) || 1 }));
 
-export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null, push = null }) {
+export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null, push = null, shipping = null, expressPay = null }) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
@@ -69,7 +73,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       res.set("Cache-Control", "no-store").json(await fn(req, res));
     } catch (e) {
       if (e instanceof ShopError || e instanceof MediaError || (e?.status >= 400 && e.status < 500) || e?.name === "BchError")
-        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}), ...(e.errors ? { errors: e.errors } : {}) });
+        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}), ...(e.errors ? { errors: e.errors } : {}), ...(e.extra ?? {}) });
       next(e);
     }
   };
@@ -103,13 +107,39 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     stripe: stripe.enabled,
     stripeTest: stripe.enabled && stripe.testMode,
     bch: bch.enabled,
+    // Live Shippo prices apply now: the checkout must ask /api/shipping-rates and send quoteId + rateId.
+    liveShipping: shipping?.liveNow() ?? false,
     // Receipts as CashTokens are offered with Bitcoin Cash; "Spread the word" is open.
     bchReceipts: (bch.receiptsOn?.() ?? false),
+    couponCodes: anyActive(store.getSettings()),
+    // Apple Pay / Google Pay on the checkout page: { publishableKey } only when it can work right now.
+    express: expressPay?.feed() ?? null,
     partners: (bch.partnersOn?.() ?? false) ? { ratePercent: store.getSettings().partners.ratePercent } : null,
   });
 
-  web.get("/catalog", send(() => ({ items: store.catalog(), settings: store.getSettings(), payments: payments() })));
+  web.get("/catalog", send(() => ({ items: store.catalog(), settings: publicSettings(store.getSettings()), payments: payments() })));
   web.get("/item/:slug", send((req) => ({ item: store.itemBySlug(req.params.slug) })));
+
+  web.post("/shipping-rates", limit(20), send(async (req) => {
+    if (!shipping?.liveNow()) fail("Live shipping prices aren't available right now.", 409);
+    const b = req.body ?? {};
+    return shipping.quote({ lines: readLines(b.lines), customer: readCustomer(b.customer), address: b.address });
+  }));
+  // Apple Pay / Google Pay: prices for the wallet's partial address, then the order + PaymentIntent once the shopper approves.
+  const needExpress = () => expressPay ?? fail("Apple Pay and Google Pay aren't available right now.", 409);
+  web.post("/express/rates", limit(30), send((req) => {
+    const b = req.body ?? {};
+    return needExpress().rates({ lines: readLines(b.lines), address: b.address, coupon: str(b.coupon, 60) });
+  }));
+  web.post("/express/order", limit(10), send((req) => {
+    const b = req.body ?? {};
+    return needExpress().order({
+      lines: readLines(b.lines), quoteId: str(b.quoteId, 100), rateId: str(b.rateId, 100), coupon: str(b.coupon, 60),
+      name: b.name, email: b.email, phone: b.phone, address: b.address ?? b.shipping?.address, expectedTotalCents: b.expectedTotalCents,
+    });
+  }));
+  // The code box on the checkout page: the discount is worked out here, the browser only types the code.
+  web.post("/coupon", limit(20), send((req) => checkCoupon(store, { code: str(req.body?.code, 60), lines: readLines(req.body?.lines) })));
 
   web.post(
     "/checkout",
@@ -121,7 +151,12 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       if (!customer.name) fail("Please add your name.");
       if (!customer.email) fail("Please add your email, so I can send your receipt and pickup details.");
       const fulfillment = b.fulfillment === "ship" && settings.shipping ? "ship" : "pickup";
-      const base = { lines: readLines(b.lines), customer, fulfillment, defaultShippingCents: settings.defaultShippingCents };
+      const base = { lines: readLines(b.lines), customer, fulfillment, defaultShippingCents: settings.defaultShippingCents, coupon: str(b.coupon, 60) };
+
+      // Live prices: the buyer must have chosen one of the quoted options for this cart and address; its exact price replaces the flat one.
+      if (fulfillment === "ship" && shipping?.liveNow(settings) && b.method !== "pickup") {
+        Object.assign(base, shipping.choose({ lines: base.lines, address: b.address, quoteId: str(b.quoteId, 100), rateId: str(b.rateId, 100) }));
+      }
       if (b.method === "pickup") {
         if (!settings.payAtPickup || fulfillment !== "pickup") fail("Pay at pickup isn't available.");
         const order = store.placeOrder({ ...base, status: "reserved", holdMinutes: settings.payAtPickupHours * 60 });
@@ -130,9 +165,9 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       }
       if (b.method === "stripe") {
         if (!stripe.enabled) fail("Card payments aren't available right now.");
-        const order = store.placeOrder({ ...base, method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES });
+        const order = store.placeOrder({ ...base, method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 50 });
         try {
-          return { url: await stripe.start(order, { cancelUrl: `${config.siteUrl}/checkout?cancelled=${order.id}` }) };
+          return { url: await stripe.start(order, { cancelUrl: `${config.siteUrl}/checkout?cancelled=${order.id}`, walletsOnPage: b.walletsOnPage === true }) };
         } catch (e) {
           store.releaseOrder(order.id);
           throw e;
@@ -143,7 +178,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
         // Came through a partner's link (?s=<code>): their commission is paid with this Bitcoin Cash sale.
         const partner = (bch.partnersOn?.() ?? false) && partners ? partners.forCode(str(b.partner, 40)) : null;
         const receiptPref = ["email", "token", "both"].includes(b.receipt) ? b.receipt : "email";
-        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES, partnerId: partner?.id ?? null, receiptPref });
+        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 1, partnerId: partner?.id ?? null, receiptPref });
         return { url: `/order/${order.id}` };
       }
       fail("Pick how you'd like to pay.");
@@ -156,7 +191,12 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   // Back from Stripe: ask Stripe now instead of waiting for its notice.
   web.post("/orders/:id/stripe-return", orders, send(async (req) => {
     const order = mustOrder(req.params.id);
-    if (order.status === "pending" && stripe.enabled) await stripe.syncById(str(req.body?.sessionId, 300)).catch(() => null);
+    if (order.status === "pending" && stripe.enabled) {
+      // Back from the hosted page (session_id) or from Apple Pay / Google Pay (payment_intent).
+      const intent = str(req.body?.paymentIntentId ?? req.body?.paymentIntent, 300);
+      if (intent) await stripe.syncIntentById?.(order.id, intent).catch(() => null);
+      else await stripe.syncById(str(req.body?.sessionId, 300)).catch(() => null);
+    }
     return { order: buyerView(mustOrder(req.params.id)) };
   }));
 
@@ -164,7 +204,10 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   web.post("/orders/:id/pay", limit(20), send(async (req) => {
     let order = mustOrder(req.params.id);
     const method = req.body?.method;
-    if (method === "bch" && order.stripeSessionId) order = (await stripe.close(order)) ?? order;
+    // An Apple Pay / Google Pay order: its PaymentIntent is cancelled first (or found paid), so the buyer is never charged twice.
+    if (order.stripePaymentIntent && !order.stripeSessionId && stripe.closeIntent) order = await stripe.closeIntent(order);
+    // An open Stripe page is closed first (or found paid), whichever way they pay now: never two charges.
+    if (order.stripeSessionId) order = (await stripe.close(order)) ?? order;
     if (order.status !== "pending") fail(order.status === "paid" || order.status === "completed" ? "This order is already paid." : "This order has closed.", 409);
     if (method === "stripe" && stripe.enabled) {
       if (bch.enabled && (await bch.payment(order.id))) {
@@ -182,7 +225,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   }));
 
   web.post("/orders/:id/cancel", limit(20), send(async (req) => {
-    const order = mustOrder(req.params.id);
+    let order = mustOrder(req.params.id);
+    if (order.stripePaymentIntent && !order.stripeSessionId && stripe.closeIntent) order = await stripe.closeIntent(order);
     if (!["pending", "reserved"].includes(order.status)) return { status: order.status };
     if (order.method === "bch" && bch.enabled && (await bch.payment(order.id))) {
       const view = await bch.status(order.id).catch(() => null);
@@ -274,6 +318,13 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     return { photo: await saveImage(config, req.file.buffer) };
   }));
 
+  // Shipping labels (Shippo): price one by hand, buy it, check a lost answer, mark shipped.
+  const needShipping = () => shipping ?? fail("Shipping isn't set up.", 503);
+  sell.post("/orders/:id/label/rates", express.json({ limit: "8kb" }), send(async (req) => ({ order: await needShipping().getRates(req.params.id, req.body?.parcel) })));
+  sell.post("/orders/:id/label/buy", express.json({ limit: "8kb" }), send(async (req) => ({ order: await needShipping().buyLabel(req.params.id, str(req.body?.rateId, 100)) })));
+  sell.post("/orders/:id/label/check", send(async (req) => ({ order: await needShipping().checkLabel(req.params.id) })));
+  sell.post("/orders/:id/shipped", express.json({ limit: "8kb" }), send(async (req) => ({ order: await needShipping().markShipped(req.params.id, { carrier: str(req.body?.carrier, 20), trackingNumber: str(req.body?.trackingNumber, 40) }) })));
+
   sell.get("/orders", send(() => ({ orders: store.listOrders() })));
   sell.get("/orders/:id", send(async (req) => {
     const order = mustOrder(req.params.id);
@@ -354,22 +405,26 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     return push.send({ title: "Notifications are on", body: "You'll get one here when something's held, sold, or a hold is cancelled.", url: "/sell/orders", tag: "test" });
   }));
 
-  sell.get("/settings", send(() => ({ settings: store.getSettings() })));
+  // shippo: which Shippo key and mode live shipping uses right now (follows Stripe's test/live mode).
+  sell.get("/settings", send(() => ({ settings: store.getSettings(), shippo: shipping?.keyInfo() ?? null })));
   sell.put("/settings", express.json({ limit: "32kb" }), send(async (req) => {
     const settings = store.saveSettings(req.body ?? {});
     await bch.syncReceiptLook?.().catch((e) => console.error("[bch] receipt look:", e.message));
-    return { settings };
+    return { settings, shippo: shipping?.keyInfo() ?? null };
   }));
   sell.get("/status", send(() => ({
     server: true,
     stripe: stripe.enabled ? (stripe.testMode ? "test" : "live") : null,
     stripeWebhook: Boolean(config.stripeWebhookSecret),
+    // Apple Pay / Google Pay: ready, or why not; and whether Stripe's own page is set to be the card form only.
+    express: { ready: expressPay?.ready() ?? false, why: expressPay?.problem() ?? null, cardOnlyConfig: Boolean(stripe.cardOnlyConfig) },
     bch: bch.enabled,
     cashTokens: Boolean(config.bchCashTokens),
     bchFirstAddress: bch.enabled ? bch.firstAddress() : null,
     hotWallet: bch.enabled ? Boolean(bch.hotWallet) : false,
     receipts: bch.enabled ? (bch.receiptsOn?.() ?? false) : false,
     partners: bch.enabled ? (bch.partnersOn?.() ?? false) : false,
+    shippo: shipping?.keyInfo() ?? null,
     email: notifier.enabled,
     phones: push?.count() ?? 0,
     publicUrl: config.publicUrl || null,

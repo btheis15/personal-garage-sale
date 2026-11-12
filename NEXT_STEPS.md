@@ -154,7 +154,8 @@ All of these go in the **Mac mini's** `server/.env`, then restart:
 - [ ] Stripe → Developers → API keys → `STRIPE_SECRET_KEY=sk_test_…` (test first)
 - [ ] Stripe → Developers → Webhooks → **Add destination** → `https://<duckdns-name>.duckdns.org/stripe/webhook`,
       events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-      `checkout.session.async_payment_failed`, `checkout.session.expired` → its signing secret
+      `checkout.session.async_payment_failed`, `checkout.session.expired`, plus `payment_intent.succeeded`,
+      `payment_intent.payment_failed`, `payment_intent.canceled` (Apple Pay / Google Pay) → its signing secret
       into `STRIPE_WEBHOOK_SECRET=whsec_…`
 - [ ] Restart, then buy something with card `4242 4242 4242 4242` (any future date, any CVC).
       The order turns Paid and the item turns Sold.

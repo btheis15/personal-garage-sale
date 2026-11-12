@@ -3,11 +3,13 @@
  * from the database (never from the browser), and checkouts hold items in one transaction.
  */
 import { randomUUID } from "node:crypto";
+import { discountFor, findCoupon, parseCouponCodes } from "./coupons.js";
 import { CATEGORIES, CHANNELS, CONDITIONS, DEFAULT_SETTINGS, SOLD_SHOWN_DAYS, STATUSES, slugify } from "./site.js";
 
 export class ShopError extends Error {
-  constructor(message, { status = 400, itemIds = undefined, errors = undefined } = {}) {
+  constructor(message, { status = 400, itemIds = undefined, errors = undefined, extra = undefined } = {}) {
     super(message);
+    this.extra = extra;
     this.status = status;
     this.itemIds = itemIds;
     this.errors = errors;
@@ -46,6 +48,10 @@ export function toItem(r) {
     pickup: Boolean(r.pickup),
     ships: Boolean(r.ships),
     shippingCents: r.shipping_cents,
+    weightOz: r.weight_oz ?? null,
+    boxLengthIn: r.box_length_in ?? null,
+    boxWidthIn: r.box_width_in ?? null,
+    boxHeightIn: r.box_height_in ?? null,
     featured: Boolean(r.featured),
     channels: json(r.channels, {}),
     notes: r.notes,
@@ -68,12 +74,22 @@ export function toOrder(r) {
     items: json(r.items, []),
     subtotalCents: r.subtotal_cents,
     shippingCents: r.shipping_cents,
+    discountCents: r.discount_cents ?? 0,
+    coupon: r.coupon ?? null,
     totalCents: r.total_cents,
     fulfillment: r.fulfillment,
     customer: json(r.customer, {}),
     stripeSessionId: r.stripe_session_id,
+    stripePaymentIntent: r.stripe_payment_intent,
     partnerId: r.partner_id ?? null,
     receiptPref: r.receipt_pref ?? null,
+    shipTo: json(r.ship_to, null),
+    label: json(r.label, null),
+    trackingCarrier: r.tracking_carrier ?? null,
+    trackingNumber: r.tracking_number ?? null,
+    trackingUrl: r.tracking_url ?? null,
+    shippedAt: r.shipped_at ?? null,
+    problem: r.problem ?? null,
     holdUntil: r.hold_until,
     paidAt: r.paid_at,
     completedAt: r.completed_at,
@@ -82,7 +98,8 @@ export function toOrder(r) {
   };
 }
 
-const publicItem = ({ notes, ...rest }) => rest;
+// The website doesn't need the owner's notes or the packing details.
+const publicItem = ({ notes, weightOz, boxLengthIn, boxWidthIn, boxHeightIn, ...rest }) => rest;
 
 export const isId = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id ?? ""));
 
@@ -92,7 +109,19 @@ const cents = (v) => {
   return Number.isFinite(n) && n >= 0 && n <= 100_000_000 ? Math.round(n) : null;
 };
 
+/** A positive number up to `max` (rounded to 2 places), or null when blank; NaN-ish input is an error. */
+function measure(v, max, what) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (!(n > 0 && n <= max)) throw new ShopError(`${what} must be more than 0 and at most ${max}.`);
+  return Math.round(n * 100) / 100;
+}
+
+const ADDRESS_KEYS = ["name", "street1", "street2", "city", "state", "zip", "phone", "email"];
+
 export function createStore(db, { now = () => Date.now(), onChange = () => {} } = {}) {
+  // Called with the order each time it newly becomes paid (live shipping buys its label from here).
+  let paidHook = () => {};
   const iso = (ms = now()) => new Date(ms).toISOString();
 
   // --- Settings ---------------------------------------------------------------------
@@ -100,7 +129,14 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
   function getSettings() {
     const row = db.prepare("select value from settings where key = 'site'").get();
     const saved = json(row?.value, {});
-    return { ...DEFAULT_SETTINGS, ...saved, partners: { ...DEFAULT_SETTINGS.partners, ...(saved.partners ?? {}) } };
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      partners: { ...DEFAULT_SETTINGS.partners, ...(saved.partners ?? {}) },
+      shipFrom: { ...DEFAULT_SETTINGS.shipFrom, ...(saved.shipFrom ?? {}) },
+      package: { ...DEFAULT_SETTINGS.package, ...(saved.package ?? {}) },
+      couponCodes: saved.couponCodes ?? [],
+    };
   }
 
   const LIMITS = { name: 60, tagline: 140, about: 3000, pickupArea: 120, pickupInstructions: 2000, contactEmail: 120, contactPhone: 40, venmo: 60, announcement: 140, receiptNote: 120 };
@@ -109,7 +145,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     for (const [k, max] of Object.entries(LIMITS)) if (typeof body[k] === "string") next[k] = body[k].trim().slice(0, max);
     if (!next.name) throw new ShopError("The shop needs a name.");
     if (next.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.contactEmail)) throw new ShopError("That email address doesn't look right.");
-    for (const k of ["payAtPickup", "shipping"]) if (typeof body[k] === "boolean") next[k] = body[k];
+    for (const k of ["payAtPickup", "shipping", "liveShipping"]) if (typeof body[k] === "boolean") next[k] = body[k];
     if (body.payAtPickupHours !== undefined) {
       const h = Math.round(Number(body.payAtPickupHours));
       if (!(h >= 1 && h <= 336)) throw new ShopError("Hold pay-at-pickup items for 1 to 336 hours.");
@@ -120,6 +156,26 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       if (!(c >= 0 && c <= 100_000)) throw new ShopError("Shipping must be between $0 and $1,000.");
       next.defaultShippingCents = c;
     }
+    if (body.shipFrom && typeof body.shipFrom === "object") {
+      const f = { ...next.shipFrom };
+      for (const k of ADDRESS_KEYS) if (typeof body.shipFrom[k] === "string") f[k] = body.shipFrom[k].trim().slice(0, k === "email" ? 120 : 80);
+      f.state = f.state.toUpperCase();
+      if (f.state && !/^[A-Z]{2}$/.test(f.state)) throw new ShopError("Ship-from state is the 2-letter code, like WI.");
+      if (f.zip && !/^\d{5}(-\d{4})?$/.test(f.zip)) throw new ShopError("Ship-from ZIP code doesn't look right.");
+      if (f.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) throw new ShopError("Ship-from email doesn't look right.");
+      next.shipFrom = f;
+    }
+    if (body.package && typeof body.package === "object") {
+      const p = { ...next.package };
+      for (const [k, max, what] of [["lengthIn", 108, "Box length"], ["widthIn", 108, "Box width"], ["heightIn", 108, "Box height"], ["weightOz", 1120, "Package weight"]]) {
+        if (body.package[k] === undefined) continue;
+        const n = measure(body.package[k], max, what);
+        if (n === null) throw new ShopError(`${what} is needed.`);
+        p[k] = n;
+      }
+      next.package = p;
+    }
+    if (body.couponCodes !== undefined) next.couponCodes = parseCouponCodes(body.couponCodes);
     if (body.partners && typeof body.partners === "object") {
       const p = { ...next.partners };
       if (typeof body.partners.enabled === "boolean") p.enabled = body.partners.enabled;
@@ -200,6 +256,10 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       }
     }
 
+    const weightOz = has("weightOz") ? measure(body.weightOz, 1120, "Weight (oz)") : (base?.weightOz ?? null);
+    const box = ["boxLengthIn", "boxWidthIn", "boxHeightIn"].map((k) => (has(k) ? measure(body[k], 108, "Box size") : (base?.[k] ?? null)));
+    if (box.some((v) => v !== null) && box.some((v) => v === null)) throw new ShopError("Give the box's length, width and height, or leave all three empty.");
+
     const quantity = has("quantity") ? Math.max(0, Math.min(999, Math.round(Number(body.quantity)))) : (base?.quantity ?? 1);
     if (!Number.isFinite(quantity)) throw new ShopError("Quantity must be a number.");
     return {
@@ -218,6 +278,10 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       pickup: has("pickup") ? Boolean(body.pickup) : (base?.pickup ?? true),
       ships: has("ships") ? Boolean(body.ships) : (base?.ships ?? false),
       shippingCents: has("shippingCents") ? cents(body.shippingCents) : (base?.shippingCents ?? null),
+      weightOz,
+      boxLengthIn: box[0],
+      boxWidthIn: box[1],
+      boxHeightIn: box[2],
       featured: has("featured") ? Boolean(body.featured) : (base?.featured ?? false),
       channels,
       notes: has("notes") ? text(body.notes, 2000) : (base?.notes ?? ""),
@@ -253,6 +317,10 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       pickup: input.pickup || !input.ships ? 1 : 0,
       ships: input.ships ? 1 : 0,
       shipping_cents: input.shippingCents,
+      weight_oz: input.weightOz,
+      box_length_in: input.boxLengthIn,
+      box_width_in: input.boxWidthIn,
+      box_height_in: input.boxHeightIn,
       featured: input.featured ? 1 : 0,
       channels: JSON.stringify(input.channels),
       notes: input.notes,
@@ -331,7 +399,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     return ids;
   }
 
-  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref }) => {
+  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref, shippingOverrideCents, shipTo, label, coupon, minTotalCents }) => {
     const hold = holdMinutes === null || holdMinutes === undefined ? null : iso(now() + holdMinutes * 60_000);
     const snapshot = [];
     let subtotal = 0;
@@ -344,17 +412,27 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       const left = it.quantity - qty;
       db.prepare("update items set quantity = ?, held_until = ?, updated_at = ? where id = ?").run(left, left === 0 ? hold : it.held_until, iso(), it.id);
       const photo = json(it.photos, [])[0];
-      snapshot.push({ id: it.id, slug: it.slug, title: it.title, priceCents: it.price_cents, qty, photo: photo ? mediaUrl(photo, photo.maxWidth > 480 ? 480 : photo.maxWidth) : null });
+      snapshot.push({
+        id: it.id, slug: it.slug, title: it.title, priceCents: it.price_cents, qty, photo: photo ? mediaUrl(photo, photo.maxWidth > 480 ? 480 : photo.maxWidth) : null,
+        // Kept so a label can be priced later from the order alone.
+        ...(it.weight_oz ? { weightOz: it.weight_oz } : {}),
+        ...(it.box_length_in ? { box: [it.box_length_in, it.box_width_in, it.box_height_in] } : {}),
+      });
       subtotal += it.price_cents * qty;
       if (fulfillment === "ship") ship = Math.max(ship, it.shipping_cents ?? defaultShippingCents ?? 0);
     }
+    // A live Shippo price the buyer chose replaces the flat per-item shipping.
+    if (fulfillment === "ship" && shippingOverrideCents !== null && shippingOverrideCents !== undefined) ship = shippingOverrideCents;
+    const discount = coupon ? discountFor(coupon, subtotal) : 0;
+    const total = subtotal - discount + ship;
+    if (discount > 0 && total < (minTotalCents ?? 0)) throw new ShopError("That code takes the order below the smallest amount we can charge. Try without it.", { status: 409, errors: { coupon: "That code covers too much of this order." } });
     const number = (db.prepare("select max(number) as n from orders").get().n ?? 1000) + 1;
     const t = iso();
     const id = randomUUID();
     db.prepare(
-      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, partner_id, receipt_pref, created_at, updated_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, subtotal + ship, fulfillment, JSON.stringify(customer ?? {}), hold, partnerId ?? null, receiptPref ?? null, t, t);
+      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, partner_id, receipt_pref, ship_to, label, discount_cents, coupon, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, total, fulfillment, JSON.stringify(customer ?? {}), hold, partnerId ?? null, receiptPref ?? null, shipTo ? JSON.stringify(shipTo) : null, label ? JSON.stringify(label) : null, discount, discount > 0 ? coupon.code : null, t, t);
     return id;
   });
 
@@ -362,11 +440,15 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
    * Creates an order and takes its items out of stock in one go, so two buyers can never get the
    * last one. lines: [{ id, qty }]. Gives back stale holds first.
    */
-  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0, partnerId = null, receiptPref = null }) {
+  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0, partnerId = null, receiptPref = null, shippingOverrideCents = null, shipTo = null, label = null, coupon = null, minTotalCents = 0 }) {
     const clean = (Array.isArray(lines) ? lines : []).filter((l) => isId(l?.id)).slice(0, 50);
     if (!clean.length) throw new ShopError("Your cart is empty.");
     expireStale();
-    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref });
+    // A typed code is checked again here against the saved settings (the browser never sends money).
+    const typed = typeof coupon === "string" ? coupon.trim() : "";
+    const found = typed ? findCoupon(getSettings(), typed) : null;
+    if (typed && !found) throw new ShopError("That code isn't valid.", { status: 400, errors: { coupon: "That code isn't valid." } });
+    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref, shippingOverrideCents, shipTo, label, coupon: found, minTotalCents });
     onChange();
     return getOrder(id);
   }
@@ -402,7 +484,13 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
   function markPaid(id, method = null, paymentIntent = null) {
     if (!paidTx(id, method, paymentIntent)) return null;
     onChange();
-    return getOrder(id);
+    const order = getOrder(id);
+    try {
+      paidHook(order);
+    } catch (e) {
+      console.error(`[shipping] order ${order.number}: ${e.message}`);
+    }
+    return order;
   }
 
   function completeOrder(id) {
@@ -411,13 +499,17 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
   }
 
   function setOrderFields(id, fields) {
-    const allowed = { method: "method", stripeSessionId: "stripe_session_id", notes: "notes", customer: "customer" };
+    const allowed = {
+      method: "method", stripeSessionId: "stripe_session_id", notes: "notes", customer: "customer",
+      stripePaymentIntent: "stripe_payment_intent", shipTo: "ship_to", label: "label", trackingCarrier: "tracking_carrier", trackingNumber: "tracking_number", trackingUrl: "tracking_url", shippedAt: "shipped_at", problem: "problem",
+    };
+    const jsonKeys = ["customer", "shipTo", "label"];
     const sets = [];
     const vals = [];
     for (const [k, col] of Object.entries(allowed)) {
       if (!(k in fields)) continue;
       sets.push(`${col} = ?`);
-      vals.push(k === "customer" ? JSON.stringify(fields[k] ?? {}) : fields[k]);
+      vals.push(jsonKeys.includes(k) ? (k !== "customer" && fields[k] === null ? null : JSON.stringify(fields[k] ?? {})) : fields[k]);
     }
     if (!sets.length) return getOrder(id);
     db.prepare(`update orders set ${sets.join(", ")}, updated_at = ? where id = ?`).run(...vals, iso(), id);
@@ -429,7 +521,27 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     return db.prepare("select * from orders order by created_at desc limit ?").all(limit).map(toOrder);
   }
 
+  /**
+   * The cart as it would be sold right now, without holding anything (live shipping quotes):
+   * [{ id, title, qty, priceCents, weightOz, box }]. Same checks as placeOrder.
+   */
+  function priceLines(lines, { ship = false } = {}) {
+    const clean = (Array.isArray(lines) ? lines : []).filter((l) => isId(l?.id)).slice(0, 50);
+    if (!clean.length) throw new ShopError("Your cart is empty.");
+    return clean.map((line) => {
+      const qty = Math.max(1, Math.min(99, Math.round(line.qty) || 1));
+      const it = db.prepare("select * from items where id = ?").get(line.id);
+      if (!it || it.status !== "live" || it.quantity < qty) throw new ShopError("Sorry, something in your cart just sold or is on hold.", { status: 409, itemIds: [line.id] });
+      if (ship && !it.ships) throw new ShopError("One of the items is pickup only.");
+      return { id: it.id, title: it.title, qty, priceCents: it.price_cents, weightOz: it.weight_oz ?? null, box: it.box_length_in ? [it.box_length_in, it.box_width_in, it.box_height_in] : null };
+    });
+  }
+
   return {
+    setPaidHook: (fn) => {
+      paidHook = fn;
+    },
+    priceLines,
     getSettings,
     saveSettings,
     getItem,
@@ -464,10 +576,15 @@ export function buyerView(o) {
     items: o.items.map((i) => ({ ...i, photoUrl: i.photo ?? null })),
     subtotalCents: o.subtotalCents,
     shippingCents: o.shippingCents,
+    discountCents: o.discountCents,
+    coupon: o.coupon,
     totalCents: o.totalCents,
     fulfillment: o.fulfillment,
     holdUntil: o.holdUntil,
     paidAt: o.paidAt,
+    shippedAt: o.shippedAt,
+    trackingNumber: o.trackingNumber,
+    trackingUrl: o.trackingUrl,
     name: o.customer?.name ?? null,
   };
 }

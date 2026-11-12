@@ -38,6 +38,11 @@ export type Item = {
   pickup: boolean;
   ships: boolean;
   shippingCents: number | null;
+  /** Packed weight and box, for live shipping prices (optional; Sell app only). */
+  weightOz?: number | null;
+  boxLengthIn?: number | null;
+  boxWidthIn?: number | null;
+  boxHeightIn?: number | null;
   featured: boolean;
   channels: Channels;
   notes: string;
@@ -55,6 +60,20 @@ export type PublicItem = Omit<Item, "notes">;
 export type Availability = "available" | "on_hold" | "sold";
 
 export type OrderStatus = "pending" | "reserved" | "paid" | "completed" | "cancelled" | "expired";
+export type ShipAddress = { line1: string; line2?: string; city: string; state: string; postal_code: string };
+/** A Shippo price, as the Sell app shows it. */
+export type LabelRate = { id: string; label: string; cents: number; days: number | null; provider: string };
+/** Where the order's shipping label stands (Sell app only). */
+export type OrderLabel = {
+  state: "none" | "rates" | "buying" | "uncertain" | "bought";
+  auto?: boolean;
+  rates?: LabelRate[];
+  chosen?: LabelRate;
+  labelUrl?: string;
+  test?: boolean;
+  error?: string | null;
+  messages?: string[];
+};
 export type PayMethod = "stripe" | "bch" | "cash" | "venmo" | "other";
 
 export type OrderLine = { id: string; slug?: string; title: string; priceCents: number; qty: number; photo?: string | null };
@@ -69,6 +88,9 @@ export type BuyerOrder = {
   items: (OrderLine & { photoUrl: string | null })[];
   subtotalCents: number;
   shippingCents: number;
+  /** What a coupon code took off the items, and the code. */
+  discountCents: number;
+  coupon: string | null;
   totalCents: number;
   fulfillment: "pickup" | "ship";
   holdUntil: string | null;
@@ -83,6 +105,12 @@ export type Payments = {
   bch: boolean;
   /** Bitcoin Cash buyers can take their receipt as a CashToken (the collection is made in Settings). */
   bchReceipts?: boolean;
+  /** Live carrier rates apply now (switched on in Settings, with a ship-from address and a Shippo key). */
+  liveShipping?: boolean;
+  /** At least one coupon code is active, so checkout shows the "Have a code?" box. */
+  couponCodes?: boolean;
+  /** Apple Pay / Google Pay express checkout is available (the publishable key for Stripe.js), else null. */
+  express?: { publishableKey: string } | null;
   /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
   partners?: { ratePercent: number } | null;
 };
@@ -104,9 +132,22 @@ export type Order = {
   items: OrderLine[];
   subtotalCents: number;
   shippingCents: number;
+  /** What a coupon code took off the items, and the code. */
+  discountCents: number;
+  coupon: string | null;
   totalCents: number;
   fulfillment: "pickup" | "ship";
   customer: Customer;
+  /** The address the buyer gave the website, with live shipping prices. */
+  shipTo?: ShipAddress | null;
+  label?: OrderLabel | null;
+  trackingCarrier?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  /** When Brian marked it shipped. */
+  shippedAt?: string | null;
+  /** Something that needs Brian's hand (e.g. the label couldn't be bought automatically). */
+  problem?: string | null;
   stripeSessionId: string | null;
   holdUntil: string | null;
   paidAt: string | null;
@@ -139,6 +180,15 @@ export type SiteSettings = {
   announcement: string;
   /** A line printed on Bitcoin Cash receipts (CashTokens). */
   receiptNote?: string;
+  /** Live Shippo prices and automatic labels (needs the Shippo key on the Mac mini and a complete ship-from). */
+  liveShipping?: boolean;
+  shipFrom?: { name: string; street1: string; street2: string; city: string; state: string; zip: string; phone: string; email: string };
+  /** The usual box, for items without their own weight or box. */
+  package?: { lengthIn: number; widthIn: number; heightIn: number; weightOz: number };
   /** "Spread the word": friends share the sale and earn a commission on Bitcoin Cash sales. */
   partners?: { enabled: boolean; ratePercent: number; taxFormOver: number };
+  /** Coupon codes (the Sell app only: the public shop never gets this list). */
+  couponCodes?: CouponCode[];
 };
+
+export type CouponCode = { code: string; kind: "amount" | "percent"; amountCents?: number; percent?: number; maxCents?: number; active: boolean };

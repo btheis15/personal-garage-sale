@@ -6,7 +6,7 @@
  * With `push` (push.js), Brian's phone also gets a notification for holds, online sales and cancelled holds.
  */
 import nodemailer from "nodemailer";
-import { buyerPaidEmail, buyerReservedEmail, ownerCancelledEmail, ownerPaidEmail, ownerReservedEmail, testEmail } from "./emails.js";
+import { buyerPaidEmail, buyerReservedEmail, buyerShippedEmail, buyerTrackingEmail, ownerCancelledEmail, ownerProblemEmail, ownerPaidEmail, ownerReservedEmail, testEmail } from "./emails.js";
 import { moneyText } from "./site.js";
 
 export function createNotifier({ config, store, push = null, makeTransport = (o) => nodemailer.createTransport(o) }) {
@@ -57,6 +57,25 @@ export function createNotifier({ config, store, push = null, makeTransport = (o)
     await send(owner(shop), ownerCancelledEmail({ order: o, shop, siteUrl: config.siteUrl }));
   }
 
+  /** The label's tracking number, to the buyer (the order isn't shipped yet). */
+  async function tracking(o) {
+    if (!o.customer.email) return;
+    await send(o.customer.email, buyerTrackingEmail({ order: o, shop: store.getSettings(), siteUrl: config.siteUrl }), replyTo(store.getSettings()));
+  }
+
+  /** Brian marked it shipped. */
+  async function shipped(o) {
+    if (!o.customer.email) return;
+    await send(o.customer.email, buyerShippedEmail({ order: o, shop: store.getSettings(), siteUrl: config.siteUrl }), replyTo(store.getSettings()));
+  }
+
+  /** Something about the order needs Brian (a label that wasn't bought automatically). */
+  async function problem(o, message) {
+    const shop = store.getSettings();
+    notify(o, `Needs a look: order #${o.number}`, message);
+    await send(owner(shop), ownerProblemEmail({ order: o, shop, siteUrl: config.siteUrl, message }));
+  }
+
   /** A test email to `to`; unlike order emails, failures are thrown so the caller sees them. */
   async function test(to) {
     if (!transport) throw new Error("Email isn't set up: add SMTP_USER and SMTP_PASS to .env.");
@@ -65,5 +84,5 @@ export function createNotifier({ config, store, push = null, makeTransport = (o)
   }
 
   const quietly = (fn) => (o, opts) => fn(o, opts).catch((e) => console.error(`[email] order ${o.number}: ${e.message}`));
-  return { enabled, paid: quietly(paid), reserved: quietly(reserved), cancelled: quietly(cancelled), test };
+  return { enabled, paid: quietly(paid), reserved: quietly(reserved), cancelled: quietly(cancelled), tracking: quietly(tracking), shipped: quietly(shipped), problem: quietly(problem), test };
 }
