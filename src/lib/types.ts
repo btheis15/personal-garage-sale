@@ -83,6 +83,10 @@ export type Payments = {
   bch: boolean;
   /** Bitcoin Cash buyers can take their receipt as a CashToken (the collection is made in Settings). */
   bchReceipts?: boolean;
+  /** Live carrier rates apply now (switched on in Settings, with a ship-from address and a Shippo key). */
+  liveShipping?: boolean;
+  /** At least one coupon code is active, so checkout shows the "Have a code?" box. */
+  couponCodes?: boolean;
   /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
   partners?: { ratePercent: number } | null;
 };
