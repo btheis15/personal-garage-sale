@@ -111,8 +111,6 @@ export type Payments = {
   couponCodes?: boolean;
   /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
   partners?: { ratePercent: number } | null;
-  /** At least one coupon code is switched on (show the code box). */
-  couponCodes?: boolean;
 };
 
 export type Customer = {
