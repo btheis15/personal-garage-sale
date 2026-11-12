@@ -174,6 +174,8 @@ const LATER_COLUMNS = [
   ["items", "box_length_in", "real"],
   ["items", "box_width_in", "real"],
   ["items", "box_height_in", "real"],
+  ["orders", "discount_cents", "integer not null default 0"],
+  ["orders", "coupon", "text"],
 ];
 
 export function openDb(file = ":memory:") {

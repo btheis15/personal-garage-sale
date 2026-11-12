@@ -169,7 +169,8 @@ export function createBch({ config, db, store, notifier, chain: givenChain, pric
     return engine.start({
       id: order.id,
       label: `Order ${order.number}`,
-      subtotalCents: order.subtotalCents,
+      // The items after any coupon code (shipping is never discounted).
+      subtotalCents: order.subtotalCents - (order.discountCents ?? 0),
       shippingCents: order.shippingCents,
       itemCount: order.items.reduce((n, i) => n + i.qty, 0),
       shippingLabel: order.shippingCents ? "Shipping" : null,

@@ -243,6 +243,12 @@ export function OrderView({
             </li>
           ))}
         </ul>
+        {order.discountCents > 0 && (
+          <p className="flex justify-between border-t border-line pt-3 text-leaf">
+            <span>Coupon{order.coupon ? ` (${order.coupon})` : ""}</span>
+            <span>−{money(order.discountCents)}</span>
+          </p>
+        )}
         {order.shippingCents > 0 && (
           <p className="flex justify-between border-t border-line pt-3">
             <span>Shipping</span>
