@@ -77,6 +77,7 @@ function itemsBlock(o, siteUrl, { method = null } = {}) {
   const html = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-top:1px solid ${C.line}">${rows}</table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px">
 ${sum("Subtotal", moneyText(o.subtotalCents))}
+${o.discountCents ? sum(`Coupon${o.coupon ? ` (${o.coupon})` : ""}`, `−${moneyText(o.discountCents)}`) : ""}
 ${getting ? sum(...getting) : ""}
 ${method ? sum("Paid with", method) : ""}
 <tr><td style="padding:12px 0 0;font-family:${SERIF};font-size:20px;font-weight:700;color:${C.ink}">Total</td>
@@ -85,6 +86,7 @@ ${method ? sum("Paid with", method) : ""}
   const text = [
     ...o.items.map((i) => `  ${i.qty > 1 ? `${i.qty} × ` : ""}${i.title}  ${moneyText(i.priceCents * i.qty)}`),
     `  Subtotal  ${moneyText(o.subtotalCents)}`,
+    ...(o.discountCents ? [`  Coupon${o.coupon ? ` (${o.coupon})` : ""}  −${moneyText(o.discountCents)}`] : []),
     ...(getting ? [`  ${getting[0]}  ${getting[1]}`] : []),
     ...(method ? [`  Paid with  ${method}`] : []),
     `  Total  ${moneyText(o.totalCents)}`,

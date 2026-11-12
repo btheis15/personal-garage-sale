@@ -92,6 +92,12 @@ export function OrderDetail({ order: initial, photos, bch, commission = null }: 
             <p className="font-bold">{money(i.priceCents * i.qty)}</p>
           </li>
         ))}
+        {order.discountCents > 0 && (
+          <li className="flex justify-between p-3 text-leaf">
+            <span>Coupon{order.coupon ? ` (${order.coupon})` : ""}</span>
+            <span>−{money(order.discountCents)}</span>
+          </li>
+        )}
         {order.shippingCents > 0 && (
           <li className="flex justify-between p-3">
             <span>Shipping</span>

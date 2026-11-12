@@ -9,6 +9,7 @@
  * The website (Authorization: Bearer SHOP_API_TOKEN):
  *   GET  /api/catalog             items for sale (+ recently sold), settings, which payments are on
  *   GET  /api/item/:slug          one item, sold ones too
+ *   POST /api/coupon              what a typed coupon code would take off the cart
  *   POST /api/checkout            holds the items and starts the payment
  *   GET  /api/orders/:id          the buyer's order page;  POST …/pay, …/cancel, …/stripe-return
  *   POST /api/orders/:id/bch/start · GET …/bch · POST …/bch/:action   Bitcoin Cash
@@ -24,6 +25,7 @@ import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import multer from "multer";
 import { deleteImages, MediaError, saveImage } from "./media.js";
+import { anyActive, checkCoupon, publicSettings } from "./coupons.js";
 import { CHECKOUT_HOLD_MINUTES, IN_PERSON_HOLD_MINUTES } from "./site.js";
 import { buyerView, ShopError } from "./store.js";
 
@@ -105,11 +107,15 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     bch: bch.enabled,
     // Receipts as CashTokens are offered with Bitcoin Cash; "Spread the word" is open.
     bchReceipts: (bch.receiptsOn?.() ?? false),
+    couponCodes: anyActive(store.getSettings()),
     partners: (bch.partnersOn?.() ?? false) ? { ratePercent: store.getSettings().partners.ratePercent } : null,
   });
 
-  web.get("/catalog", send(() => ({ items: store.catalog(), settings: store.getSettings(), payments: payments() })));
+  web.get("/catalog", send(() => ({ items: store.catalog(), settings: publicSettings(store.getSettings()), payments: payments() })));
   web.get("/item/:slug", send((req) => ({ item: store.itemBySlug(req.params.slug) })));
+
+  // The code box on the checkout page: the discount is worked out here, the browser only types the code.
+  web.post("/coupon", limit(20), send((req) => checkCoupon(store, { code: str(req.body?.code, 60), lines: readLines(req.body?.lines) })));
 
   web.post(
     "/checkout",
@@ -121,7 +127,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       if (!customer.name) fail("Please add your name.");
       if (!customer.email) fail("Please add your email, so I can send your receipt and pickup details.");
       const fulfillment = b.fulfillment === "ship" && settings.shipping ? "ship" : "pickup";
-      const base = { lines: readLines(b.lines), customer, fulfillment, defaultShippingCents: settings.defaultShippingCents };
+      const base = { lines: readLines(b.lines), customer, fulfillment, defaultShippingCents: settings.defaultShippingCents, coupon: str(b.coupon, 60) };
       if (b.method === "pickup") {
         if (!settings.payAtPickup || fulfillment !== "pickup") fail("Pay at pickup isn't available.");
         const order = store.placeOrder({ ...base, status: "reserved", holdMinutes: settings.payAtPickupHours * 60 });
@@ -130,7 +136,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       }
       if (b.method === "stripe") {
         if (!stripe.enabled) fail("Card payments aren't available right now.");
-        const order = store.placeOrder({ ...base, method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES });
+        const order = store.placeOrder({ ...base, method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 50 });
         try {
           return { url: await stripe.start(order, { cancelUrl: `${config.siteUrl}/checkout?cancelled=${order.id}` }) };
         } catch (e) {
@@ -143,7 +149,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
         // Came through a partner's link (?s=<code>): their commission is paid with this Bitcoin Cash sale.
         const partner = (bch.partnersOn?.() ?? false) && partners ? partners.forCode(str(b.partner, 40)) : null;
         const receiptPref = ["email", "token", "both"].includes(b.receipt) ? b.receipt : "email";
-        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES, partnerId: partner?.id ?? null, receiptPref });
+        const order = store.placeOrder({ ...base, method: "bch", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 1, partnerId: partner?.id ?? null, receiptPref });
         return { url: `/order/${order.id}` };
       }
       fail("Pick how you'd like to pay.");

@@ -152,6 +152,8 @@ create table if not exists meta (
 const LATER_COLUMNS = [
   ["orders", "partner_id", "text"],
   ["orders", "receipt_pref", "text"],
+  ["orders", "discount_cents", "integer not null default 0"],
+  ["orders", "coupon", "text"],
 ];
 
 export function openDb(file = ":memory:") {

@@ -3,6 +3,7 @@
  * from the database (never from the browser), and checkouts hold items in one transaction.
  */
 import { randomUUID } from "node:crypto";
+import { discountFor, findCoupon, parseCouponCodes } from "./coupons.js";
 import { CATEGORIES, CHANNELS, CONDITIONS, DEFAULT_SETTINGS, SOLD_SHOWN_DAYS, STATUSES, slugify } from "./site.js";
 
 export class ShopError extends Error {
@@ -68,6 +69,8 @@ export function toOrder(r) {
     items: json(r.items, []),
     subtotalCents: r.subtotal_cents,
     shippingCents: r.shipping_cents,
+    discountCents: r.discount_cents ?? 0,
+    coupon: r.coupon ?? null,
     totalCents: r.total_cents,
     fulfillment: r.fulfillment,
     customer: json(r.customer, {}),
@@ -100,7 +103,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
   function getSettings() {
     const row = db.prepare("select value from settings where key = 'site'").get();
     const saved = json(row?.value, {});
-    return { ...DEFAULT_SETTINGS, ...saved, partners: { ...DEFAULT_SETTINGS.partners, ...(saved.partners ?? {}) } };
+    return { ...DEFAULT_SETTINGS, ...saved, partners: { ...DEFAULT_SETTINGS.partners, ...(saved.partners ?? {}) }, couponCodes: saved.couponCodes ?? [] };
   }
 
   const LIMITS = { name: 60, tagline: 140, about: 3000, pickupArea: 120, pickupInstructions: 2000, contactEmail: 120, contactPhone: 40, venmo: 60, announcement: 140, receiptNote: 120 };
@@ -120,6 +123,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       if (!(c >= 0 && c <= 100_000)) throw new ShopError("Shipping must be between $0 and $1,000.");
       next.defaultShippingCents = c;
     }
+    if (body.couponCodes !== undefined) next.couponCodes = parseCouponCodes(body.couponCodes);
     if (body.partners && typeof body.partners === "object") {
       const p = { ...next.partners };
       if (typeof body.partners.enabled === "boolean") p.enabled = body.partners.enabled;
@@ -331,7 +335,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
     return ids;
   }
 
-  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref }) => {
+  const placeTx = db.transaction(({ lines, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref, coupon, minTotalCents }) => {
     const hold = holdMinutes === null || holdMinutes === undefined ? null : iso(now() + holdMinutes * 60_000);
     const snapshot = [];
     let subtotal = 0;
@@ -348,13 +352,16 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
       subtotal += it.price_cents * qty;
       if (fulfillment === "ship") ship = Math.max(ship, it.shipping_cents ?? defaultShippingCents ?? 0);
     }
+    const discount = coupon ? discountFor(coupon, subtotal) : 0;
+    const total = subtotal - discount + ship;
+    if (discount > 0 && total < (minTotalCents ?? 0)) throw new ShopError("That code takes the order below the smallest amount we can charge. Try without it.", { status: 409, errors: { coupon: "That code covers too much of this order." } });
     const number = (db.prepare("select max(number) as n from orders").get().n ?? 1000) + 1;
     const t = iso();
     const id = randomUUID();
     db.prepare(
-      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, partner_id, receipt_pref, created_at, updated_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, subtotal + ship, fulfillment, JSON.stringify(customer ?? {}), hold, partnerId ?? null, receiptPref ?? null, t, t);
+      `insert into orders (id, number, status, method, channel, items, subtotal_cents, shipping_cents, total_cents, fulfillment, customer, hold_until, partner_id, receipt_pref, discount_cents, coupon, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, number, status, method, channel, JSON.stringify(snapshot), subtotal, ship, total, fulfillment, JSON.stringify(customer ?? {}), hold, partnerId ?? null, receiptPref ?? null, discount, discount > 0 ? coupon.code : null, t, t);
     return id;
   });
 
@@ -362,11 +369,15 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
    * Creates an order and takes its items out of stock in one go, so two buyers can never get the
    * last one. lines: [{ id, qty }]. Gives back stale holds first.
    */
-  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0, partnerId = null, receiptPref = null }) {
+  function placeOrder({ lines, status = "pending", method = null, channel = "web", fulfillment = "pickup", customer = {}, holdMinutes = null, defaultShippingCents = 0, partnerId = null, receiptPref = null, coupon = null, minTotalCents = 0 }) {
     const clean = (Array.isArray(lines) ? lines : []).filter((l) => isId(l?.id)).slice(0, 50);
     if (!clean.length) throw new ShopError("Your cart is empty.");
     expireStale();
-    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref });
+    // A typed code is checked again here against the saved settings (the browser never sends money).
+    const typed = typeof coupon === "string" ? coupon.trim() : "";
+    const found = typed ? findCoupon(getSettings(), typed) : null;
+    if (typed && !found) throw new ShopError("That code isn't valid.", { status: 400, errors: { coupon: "That code isn't valid." } });
+    const id = placeTx({ lines: clean, status, method, channel, fulfillment, customer, holdMinutes, defaultShippingCents, partnerId, receiptPref, coupon: found, minTotalCents });
     onChange();
     return getOrder(id);
   }
@@ -464,6 +475,8 @@ export function buyerView(o) {
     items: o.items.map((i) => ({ ...i, photoUrl: i.photo ?? null })),
     subtotalCents: o.subtotalCents,
     shippingCents: o.shippingCents,
+    discountCents: o.discountCents,
+    coupon: o.coupon,
     totalCents: o.totalCents,
     fulfillment: o.fulfillment,
     holdUntil: o.holdUntil,

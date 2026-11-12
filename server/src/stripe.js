@@ -18,12 +18,15 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
     const s = store.getSettings();
     const base = config.siteUrl;
     const image = (photo) => (photo && base ? `${base}${photo}` : null);
+    // A coupon code: a one-off Stripe coupon for exactly this order's discount (needs the key's "Coupons: write" permission).
+    const coupon = order.discountCents > 0 ? await client.coupons.create({ amount_off: order.discountCents, currency: "usd", duration: "once", max_redemptions: 1, name: String(order.coupon ?? "Coupon").slice(0, 40) }, { idempotencyKey: `coupon-${order.id}` }) : null;
     const session = await client.checkout.sessions.create({
       ui_mode: "hosted_page",
       mode: "payment",
       billing_address_collection: "auto",
       automatic_tax: { enabled: false },
       allow_promotion_codes: false,
+      ...(coupon ? { discounts: [{ coupon: coupon.id }] } : {}),
       submit_type: "auto",
       integration_identifier: "hosted_web_0002",
       origin_context: "web",

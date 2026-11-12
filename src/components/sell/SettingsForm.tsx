@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { SiteSettings } from "@/lib/types";
 import { dollars, sellApi, toCents } from "./api";
+import { CouponCodes } from "./CouponCodes";
 import { PhoneNotifications } from "./PhoneNotifications";
 import { ReceiptsSetup } from "./ReceiptsSetup";
 
@@ -123,6 +124,8 @@ export function SettingsForm({ initial, setup }: { initial: SiteSettings; setup:
             </Field>
           )}
         </div>
+
+        <CouponCodes codes={s.couponCodes ?? []} onChange={(couponCodes) => setS((x) => ({ ...x, couponCodes }))} />
 
         {setup.bch && setup.cashTokens && (
           <div className="space-y-3 rounded-2xl border border-line bg-white p-4">

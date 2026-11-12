@@ -69,6 +69,9 @@ export type BuyerOrder = {
   items: (OrderLine & { photoUrl: string | null })[];
   subtotalCents: number;
   shippingCents: number;
+  /** What a coupon code took off the items, and the code. */
+  discountCents: number;
+  coupon: string | null;
   totalCents: number;
   fulfillment: "pickup" | "ship";
   holdUntil: string | null;
@@ -85,6 +88,8 @@ export type Payments = {
   bchReceipts?: boolean;
   /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
   partners?: { ratePercent: number } | null;
+  /** At least one coupon code is switched on (show the code box). */
+  couponCodes?: boolean;
 };
 
 export type Customer = {
@@ -104,6 +109,9 @@ export type Order = {
   items: OrderLine[];
   subtotalCents: number;
   shippingCents: number;
+  /** What a coupon code took off the items, and the code. */
+  discountCents: number;
+  coupon: string | null;
   totalCents: number;
   fulfillment: "pickup" | "ship";
   customer: Customer;
@@ -141,4 +149,8 @@ export type SiteSettings = {
   receiptNote?: string;
   /** "Spread the word": friends share the sale and earn a commission on Bitcoin Cash sales. */
   partners?: { enabled: boolean; ratePercent: number; taxFormOver: number };
+  /** Coupon codes (the Sell app only: the public shop never gets this list). */
+  couponCodes?: CouponCode[];
 };
+
+export type CouponCode = { code: string; kind: "amount" | "percent"; amountCents?: number; percent?: number; maxCents?: number; active: boolean };
