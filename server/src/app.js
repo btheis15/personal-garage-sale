@@ -206,7 +206,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     const method = req.body?.method;
     // An Apple Pay / Google Pay order: its PaymentIntent is cancelled first (or found paid), so the buyer is never charged twice.
     if (order.stripePaymentIntent && !order.stripeSessionId && stripe.closeIntent) order = await stripe.closeIntent(order);
-    if (method === "bch" && order.stripeSessionId) order = (await stripe.close(order)) ?? order;
+    // An open Stripe page is closed first (or found paid), whichever way they pay now: never two charges.
+    if (order.stripeSessionId) order = (await stripe.close(order)) ?? order;
     if (order.status !== "pending") fail(order.status === "paid" || order.status === "completed" ? "This order is already paid." : "This order has closed.", 409);
     if (method === "stripe" && stripe.enabled) {
       if (bch.enabled && (await bch.payment(order.id))) {
