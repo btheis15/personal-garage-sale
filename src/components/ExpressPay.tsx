@@ -149,6 +149,7 @@ export function ExpressPay({ publishableKey, lines, openingCents, coupon, shopNa
               coupon: code,
               quoteId: quote.quoteId,
               rateId: r.id,
+              expectedTotalCents: expected,
               name: event.billingDetails?.name ?? ship.name,
               email: event.billingDetails?.email,
               phone: event.billingDetails?.phone,
