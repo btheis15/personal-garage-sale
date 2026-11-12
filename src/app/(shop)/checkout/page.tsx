@@ -16,6 +16,7 @@ export default async function CheckoutPage(props: PageProps<"/checkout">) {
         stripeTest: Boolean(payments?.stripeTest),
         bch: Boolean(payments?.bch),
         liveShipping: Boolean(payments?.liveShipping),
+        expressKey: payments?.express?.publishableKey ?? "",
         couponCodes: Boolean(payments?.couponCodes),
         bchReceipts: Boolean(payments?.bch && payments?.bchReceipts),
         shopName: s?.name ?? "Garage Sale",

@@ -8,6 +8,7 @@ import { money } from "@/lib/site";
 import { ReceiptChoice } from "./bch/ReceiptToken";
 import { cart, useCart } from "./cart/store";
 import { CheckIcon } from "./icons";
+import { ExpressPay } from "./ExpressPay";
 import { ItemPhoto } from "./ItemPhoto";
 
 type Options = {
@@ -26,6 +27,8 @@ type Options = {
   liveShipping: boolean;
   /** At least one coupon code is active. */
   couponCodes: boolean;
+  /** Stripe publishable key when Apple Pay / Google Pay express checkout is on, else "". */
+  expressKey: string;
   defaultShippingCents: number;
   pickupArea: string;
 };
@@ -68,6 +71,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
+  const [wallet, setWallet] = useState(false);
   const lastAsked = useRef("");
 
   // Back from Stripe without paying: let the items go again.
@@ -104,8 +108,11 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
   // Coupons take money off the items only, never shipping, and never below $0.
   const activeCoupon = coupon && coupon.forKey === linesKey ? coupon : null;
   const discount = activeCoupon ? Math.min(activeCoupon.discountCents, subtotal) : 0;
+  // The Express box (Apple Pay / Google Pay) is showing: the Stripe choice is then just the card form.
+  const showExpress = Boolean(options.expressKey) && options.stripe && live;
+  const walletsOnPage = showExpress && wallet;
   const methods: { value: Method; label: string; hint: string }[] = [
-    ...(options.stripe ? [{ value: "stripe" as const, label: "Card, Apple Pay or Google Pay", hint: `Secure checkout through Stripe${options.stripeTest ? " (test mode: use card 4242 4242 4242 4242)" : ""}` }] : []),
+    ...(options.stripe ? [{ value: "stripe" as const, label: walletsOnPage ? "Credit or debit card" : "Card, Apple Pay or Google Pay", hint: `Secure checkout through Stripe${options.stripeTest ? " (test mode: use card 4242 4242 4242 4242)" : ""}` }] : []),
     ...(options.bch ? [{ value: "bch" as const, label: "Bitcoin Cash", hint: "Pay from your wallet" }] : []),
     ...(options.payAtPickup && !ship
       ? [{ value: "pickup" as const, label: "Pay at pickup", hint: `I'll hold it for ${options.payAtPickupHours} hours. Cash${options.venmo ? ` or Venmo (${options.venmo})` : ""} when you pick it up.` }]
@@ -223,7 +230,7 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines, customer, fulfillment: ship ? "ship" : "pickup", method: chosen, ...(live && activeQuote && chosenRate ? { address, quoteId: activeQuote.id, rateId: chosenRate.id } : {}), ...(activeCoupon ? { coupon: activeCoupon.code } : {}), ...(chosen === "bch" && options.bchReceipts ? { receipt } : {}) }),
+        body: JSON.stringify({ lines, customer, fulfillment: ship ? "ship" : "pickup", method: chosen, ...(live && activeQuote && chosenRate ? { address, quoteId: activeQuote.id, rateId: chosenRate.id } : {}), ...(activeCoupon ? { coupon: activeCoupon.code } : {}), ...(walletsOnPage ? { walletsOnPage: true } : {}), ...(chosen === "bch" && options.bchReceipts ? { receipt } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -277,6 +284,8 @@ export function CheckoutView({ options, cancelledOrder }: { options: Options; ca
       <div className="space-y-8">
         <h1 className="text-4xl">Checkout</h1>
         {!options.open && <p className="rounded-xl bg-sun p-4 font-bold">This is a preview: checkout opens once the shop is set up.</p>}
+
+        {showExpress && <ExpressPay publishableKey={options.expressKey} lines={lines} openingCents={Math.max(0, subtotal - discount)} coupon={activeCoupon?.code} shopName={options.shopName} onAvailable={setWallet} />}
 
         <section className="space-y-3">
           <h2 className="text-xl">Your details</h2>
