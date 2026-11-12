@@ -7,8 +7,9 @@ import { discountFor, findCoupon, parseCouponCodes } from "./coupons.js";
 import { CATEGORIES, CHANNELS, CONDITIONS, DEFAULT_SETTINGS, SOLD_SHOWN_DAYS, STATUSES, slugify } from "./site.js";
 
 export class ShopError extends Error {
-  constructor(message, { status = 400, itemIds = undefined, errors = undefined } = {}) {
+  constructor(message, { status = 400, itemIds = undefined, errors = undefined, extra = undefined } = {}) {
     super(message);
+    this.extra = extra;
     this.status = status;
     this.itemIds = itemIds;
     this.errors = errors;
@@ -79,6 +80,7 @@ export function toOrder(r) {
     fulfillment: r.fulfillment,
     customer: json(r.customer, {}),
     stripeSessionId: r.stripe_session_id,
+    stripePaymentIntent: r.stripe_payment_intent,
     partnerId: r.partner_id ?? null,
     receiptPref: r.receipt_pref ?? null,
     shipTo: json(r.ship_to, null),
@@ -499,7 +501,7 @@ export function createStore(db, { now = () => Date.now(), onChange = () => {} } 
   function setOrderFields(id, fields) {
     const allowed = {
       method: "method", stripeSessionId: "stripe_session_id", notes: "notes", customer: "customer",
-      shipTo: "ship_to", label: "label", trackingCarrier: "tracking_carrier", trackingNumber: "tracking_number", trackingUrl: "tracking_url", shippedAt: "shipped_at", problem: "problem",
+      stripePaymentIntent: "stripe_payment_intent", shipTo: "ship_to", label: "label", trackingCarrier: "tracking_carrier", trackingNumber: "tracking_number", trackingUrl: "tracking_url", shippedAt: "shipped_at", problem: "problem",
     };
     const jsonKeys = ["customer", "shipTo", "label"];
     const sets = [];

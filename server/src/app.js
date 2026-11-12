@@ -4,13 +4,14 @@
  * Anyone:
  *   GET  /health                 uptime checks
  *   GET  /media/<id>/<w>.webp     photos (the website shows them through its own address)
- *   POST /stripe/webhook          Stripe's signed "paid" / "expired" notices
+ *   POST /stripe/webhook          Stripe's signed "paid" / "failed" / "expired" notices (Checkout Sessions and PaymentIntents)
  *
  * The website (Authorization: Bearer SHOP_API_TOKEN):
  *   GET  /api/catalog             items for sale (+ recently sold), settings, which payments are on
  *   GET  /api/item/:slug          one item, sold ones too
  *   POST /api/shipping-rates      live Shippo prices for a cart + address (when Settings → live shipping is on)
  *   POST /api/coupon              what a typed coupon code would take off the cart
+ *   POST /api/express/rates · /order  Apple Pay / Google Pay: prices for the wallet's address, then the order + PaymentIntent
  *   POST /api/checkout            holds the items and starts the payment
  *   GET  /api/orders/:id          the buyer's order page;  POST …/pay, …/cancel, …/stripe-return
  *   POST /api/orders/:id/bch/start · GET …/bch · POST …/bch/:action   Bitcoin Cash
@@ -50,7 +51,7 @@ function readCustomer(v) {
 }
 const readLines = (v) => (Array.isArray(v) ? v : []).slice(0, 50).map((l) => ({ id: str(l?.id, 40), qty: Number(l?.qty) || 1 }));
 
-export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null, push = null, shipping = null }) {
+export function createApp({ config, store, stripe, bch, notifier, revalidator, partners = null, sanctions = null, push = null, shipping = null, expressPay = null }) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
@@ -72,7 +73,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
       res.set("Cache-Control", "no-store").json(await fn(req, res));
     } catch (e) {
       if (e instanceof ShopError || e instanceof MediaError || (e?.status >= 400 && e.status < 500) || e?.name === "BchError")
-        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}), ...(e.errors ? { errors: e.errors } : {}) });
+        return res.status(e.status ?? 400).json({ error: e.message, ...(e.itemIds ? { itemIds: e.itemIds } : {}), ...(e.errors ? { errors: e.errors } : {}), ...(e.extra ?? {}) });
       next(e);
     }
   };
@@ -111,6 +112,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     // Receipts as CashTokens are offered with Bitcoin Cash; "Spread the word" is open.
     bchReceipts: (bch.receiptsOn?.() ?? false),
     couponCodes: anyActive(store.getSettings()),
+    // Apple Pay / Google Pay on the checkout page: { publishableKey } only when it can work right now.
+    express: expressPay?.feed() ?? null,
     partners: (bch.partnersOn?.() ?? false) ? { ratePercent: store.getSettings().partners.ratePercent } : null,
   });
 
@@ -121,6 +124,19 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     if (!shipping?.liveNow()) fail("Live shipping prices aren't available right now.", 409);
     const b = req.body ?? {};
     return shipping.quote({ lines: readLines(b.lines), customer: readCustomer(b.customer), address: b.address });
+  }));
+  // Apple Pay / Google Pay: prices for the wallet's partial address, then the order + PaymentIntent once the shopper approves.
+  const needExpress = () => expressPay ?? fail("Apple Pay and Google Pay aren't available right now.", 409);
+  web.post("/express/rates", limit(30), send((req) => {
+    const b = req.body ?? {};
+    return needExpress().rates({ lines: readLines(b.lines), address: b.address, coupon: str(b.coupon, 60) });
+  }));
+  web.post("/express/order", limit(10), send((req) => {
+    const b = req.body ?? {};
+    return needExpress().order({
+      lines: readLines(b.lines), quoteId: str(b.quoteId, 100), rateId: str(b.rateId, 100), coupon: str(b.coupon, 60),
+      name: b.name, email: b.email, phone: b.phone, address: b.address ?? b.shipping?.address, expectedTotalCents: b.expectedTotalCents,
+    });
   }));
   // The code box on the checkout page: the discount is worked out here, the browser only types the code.
   web.post("/coupon", limit(20), send((req) => checkCoupon(store, { code: str(req.body?.code, 60), lines: readLines(req.body?.lines) })));
@@ -151,7 +167,7 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
         if (!stripe.enabled) fail("Card payments aren't available right now.");
         const order = store.placeOrder({ ...base, method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 50 });
         try {
-          return { url: await stripe.start(order, { cancelUrl: `${config.siteUrl}/checkout?cancelled=${order.id}` }) };
+          return { url: await stripe.start(order, { cancelUrl: `${config.siteUrl}/checkout?cancelled=${order.id}`, walletsOnPage: b.walletsOnPage === true }) };
         } catch (e) {
           store.releaseOrder(order.id);
           throw e;
@@ -175,7 +191,12 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   // Back from Stripe: ask Stripe now instead of waiting for its notice.
   web.post("/orders/:id/stripe-return", orders, send(async (req) => {
     const order = mustOrder(req.params.id);
-    if (order.status === "pending" && stripe.enabled) await stripe.syncById(str(req.body?.sessionId, 300)).catch(() => null);
+    if (order.status === "pending" && stripe.enabled) {
+      // Back from the hosted page (session_id) or from Apple Pay / Google Pay (payment_intent).
+      const intent = str(req.body?.paymentIntentId ?? req.body?.paymentIntent, 300);
+      if (intent) await stripe.syncIntentById?.(order.id, intent).catch(() => null);
+      else await stripe.syncById(str(req.body?.sessionId, 300)).catch(() => null);
+    }
     return { order: buyerView(mustOrder(req.params.id)) };
   }));
 
@@ -391,6 +412,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
     server: true,
     stripe: stripe.enabled ? (stripe.testMode ? "test" : "live") : null,
     stripeWebhook: Boolean(config.stripeWebhookSecret),
+    // Apple Pay / Google Pay: ready, or why not; and whether Stripe's own page is set to be the card form only.
+    express: { ready: expressPay?.ready() ?? false, why: expressPay?.problem() ?? null, cardOnlyConfig: Boolean(stripe.cardOnlyConfig) },
     bch: bch.enabled,
     cashTokens: Boolean(config.bchCashTokens),
     bchFirstAddress: bch.enabled ? bch.firstAddress() : null,

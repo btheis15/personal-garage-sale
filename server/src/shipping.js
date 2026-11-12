@@ -9,6 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { createShippo, shippoKeyMode, trackingUrl } from "./shippo.js";
+import { discountFor, findCoupon } from "./coupons.js";
 import { ShopError } from "./store.js";
 
 export const QUOTE_MINUTES = 30;
@@ -29,6 +30,21 @@ export function readAddress(v) {
   if (Object.keys(errors).length) throw new ShopError("Please check your shipping address.", { status: 400, errors });
   return out;
 }
+
+/**
+ * The partial address Apple Pay / Google Pay share before the shopper approves (no street): US only, a 5-digit ZIP is needed,
+ * city and state are optional. Throws 400 with errors keyed postal_code.
+ */
+export function readPartialAddress(v) {
+  const a = v && typeof v === "object" ? v : {};
+  const country = clip(a.country, 2).toUpperCase() || "US";
+  const out = { city: clip(a.city, 60), state: clip(a.state, 20).toUpperCase(), postal_code: clip(a.postal_code, 10), country: "US" };
+  if (country !== "US" || !/^\d{5}(-?\d{4})?$/.test(out.postal_code)) throw new ShopError("Choose a US shipping address with a ZIP code.", { status: 400, errors: { postal_code: "Needed to price the shipping (US only)." } });
+  if (out.state && !/^[A-Z]{2}$/.test(out.state)) out.state = "";
+  return out;
+}
+/** A ZIP to compare: its first five digits (the sheet may share only the ZIP, the full address has ZIP+4). */
+const zip5 = (p) => String(p ?? "").replace(/\D/g, "").slice(0, 5);
 
 export const shipFromReady = (f) => Boolean(f?.name && f.street1 && f.city && f.state && f.zip && f.phone && f.email);
 
@@ -172,6 +188,90 @@ export function createShipping({ config, db, store, notifier, stripeMode, makeSh
       // auto: buy this label once the order is paid.
       label: { state: "rates", auto: true, mode: m, shipmentId: data.shipmentId, rates: [rate], parcel: data.parcel },
     };
+  }
+
+  // --- Express (Apple Pay / Google Pay) ------------------------------------------------------
+  // The wallet's sheet shares only a PARTIAL address until the shopper approves, so prices are quoted for that (with a stand-in
+  // street), and the order is made once the full address is known.
+
+  /** What an express quote is tied to: mode and the priced cart (the ZIP and state are checked by expressFits). */
+  const expressKey = (m, items) => sha256(JSON.stringify(["express", m, items.map((i) => [i.id, i.qty, i.priceCents, i.weightOz ?? null, i.box ?? null]).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)))]));
+
+  /** POST /api/express/rates: up to three live rates for a partial address, held ~30 minutes. */
+  async function expressQuote({ lines, address, coupon }) {
+    const s = store.getSettings();
+    if (!liveNow(s)) throw new ShopError("Live shipping prices aren't available right now.", { status: 409 });
+    const items = store.priceLines(lines, { ship: true });
+    const a = readPartialAddress(address);
+    const subtotalCents = items.reduce((n, i) => n + i.priceCents * i.qty, 0);
+    const discountCents = expressDiscount(coupon, subtotalCents);
+    const m = mode();
+    const parcel = parcelFor(s, items);
+    let shipment;
+    try {
+      // Shippo wants a street to price a parcel; the real one comes with the full address, once the shopper approves.
+      const to = { name: "Express checkout", line1: "Address given at payment", city: a.city || a.state || a.postal_code, state: a.state, postal_code: a.postal_code };
+      shipment = await shippoFor(m).createShipment(shipmentBody({ settings: s, to, parcel, metadata: "garage-sale express checkout quote (partial address)" }));
+    } catch (e) {
+      if (e.status === 400) throw new ShopError("Please check your shipping address.", { status: 422, errors: addressErrors(e.message) });
+      throw new ShopError("Couldn't get shipping prices right now. Please try again in a moment.", { status: 502 });
+    }
+    const picked = pickRates(ratesOf(shipment));
+    if (!picked.length) throw new ShopError("No shipping options came back for that address. Please check it and try again.", { status: 422, errors: { postal_code: "Check the address." } });
+    const rates = picked.map((r) => ({ ...r, cents: Math.round(Number(r.amount) * 100), label: rateLabel(r) }));
+    const id = randomBytes(18).toString("base64url");
+    const expiresAt = iso(now() + QUOTE_MINUTES * 60_000);
+    db.prepare("delete from shipping_quotes where expires_at < ?").run(iso(now() - 86_400_000));
+    db.prepare("insert into shipping_quotes (id, mode, fingerprint, data, created_at, expires_at) values (?, ?, ?, ?, ?, ?)").run(
+      id, m, expressKey(m, items), JSON.stringify({ express: true, postal: zip5(a.postal_code), state: a.state || null, shipmentId: shipment.object_id, parcel, rates }), iso(), expiresAt,
+    );
+    return { quoteId: id, expiresAt, subtotalCents, discountCents, rates: rates.map((r) => ({ ...publicRate(r), totalCents: subtotalCents - discountCents + r.cents })) };
+  }
+
+  /** What a typed code takes off, for express: a code that isn't valid is a 409 on errors.coupon. */
+  function expressDiscount(raw, subtotalCents) {
+    const typed = typeof raw === "string" ? raw.trim() : "";
+    if (!typed) return 0;
+    const c = findCoupon(store.getSettings(), typed);
+    if (!c) throw new ShopError("That code isn't valid.", { status: 409, errors: { coupon: "That code isn't valid." } });
+    return discountFor(c, subtotalCents);
+  }
+
+  /** The express rate the shopper chose, if its quote still fits this cart, mode and ZIP/state. Returns { rate, data, items }. */
+  function expressChoose({ lines, address, quoteId, rateId }) {
+    const pick = (msg) => new ShopError(msg, { status: 409, errors: { rate: msg } });
+    if (!quoteId || !rateId) throw pick("Choose a shipping option.");
+    const items = store.priceLines(lines, { ship: true });
+    const q = db.prepare("select * from shipping_quotes where id = ?").get(String(quoteId));
+    if (!q) throw pick("Choose a shipping option.");
+    if (q.expires_at < iso()) throw pick("Those shipping prices have expired, please choose again.");
+    const m = mode();
+    const data = JSON.parse(q.data);
+    const sameState = !data.state || !address.state || norm(data.state) === norm(address.state);
+    if (!data.express || q.mode !== m || q.fingerprint !== expressKey(m, items) || zip5(address.postal_code) !== data.postal || !sameState) throw pick("Shipping options changed, please choose again.");
+    const rate = data.rates.find((r) => r.id === rateId);
+    if (!rate) throw pick("Choose a shipping option.");
+    return { rate, data, items };
+  }
+
+  /**
+   * The label for an express order is prepared with the FULL street: a new Shippo shipment, and the same service the shopper
+   * chose (the quoted one only knew the ZIP). It's still the quoted price the shopper paid. Returns the label JSON (auto-buy on
+   * paid) and an optional note; if Shippo can't do it now, label is null and the owner uses Get rates once it's paid.
+   */
+  async function prepareExpressLabel({ to, customer, parcel, rate }) {
+    const s = store.getSettings();
+    const m = mode();
+    try {
+      const shipment = await shippoFor(m).createShipment(shipmentBody({ settings: s, to: { ...to, name: customer.name, phone: customer.phone, email: customer.email }, parcel, metadata: "garage-sale express checkout" }));
+      const same = ratesOf(shipment).filter((r) => r.token === rate.token && r.currency === "USD").sort((a, b) => Number(a.amount) - Number(b.amount))[0];
+      if (!same) throw new Error(`${rate.label} isn't offered for the full address`);
+      const chosen = { ...same, cents: Math.round(Number(same.amount) * 100), label: rateLabel(same) };
+      const note = chosen.cents !== rate.cents ? `The label costs $${(chosen.cents / 100).toFixed(2)} for the full address; the buyer paid $${(rate.cents / 100).toFixed(2)}.` : null;
+      return { label: { state: "rates", auto: true, mode: m, shipmentId: shipment.object_id, rates: [chosen], parcel }, note };
+    } catch (e) {
+      return { label: null, note: `The label couldn't be prepared with the full address (${e.message}). Use Get rates once it's paid.` };
+    }
   }
 
   // --- Labels ---------------------------------------------------------------------------------
@@ -319,7 +419,7 @@ export function createShipping({ config, db, store, notifier, stripeMode, makeSh
   }
 
   const idle = () => chain;
-  return { mode, keyInfo, liveNow, quote, choose, getRates, buyLabel, autoBuy, checkLabel, markShipped, onPaid, idle };
+  return { mode, keyInfo, liveNow, quote, choose, expressQuote, expressChoose, prepareExpressLabel, getRates, buyLabel, autoBuy, checkLabel, markShipped, onPaid, idle };
 }
 
 function fail(message, status) {

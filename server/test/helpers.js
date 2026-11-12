@@ -7,6 +7,7 @@ import { loadConfig } from "../src/config.js";
 import { openDb } from "../src/db.js";
 import { createSanctionsList } from "../src/bch.js";
 import { createPartners } from "../src/partners.js";
+import { createExpress } from "../src/express.js";
 import { createShipping } from "../src/shipping.js";
 import { createStore } from "../src/store.js";
 
@@ -21,12 +22,13 @@ export async function startServer({ stripe = fakeStripe(), bch = { enabled: fals
   const sent = [];
   const notifier = { enabled: true, tracking: (o) => sent.push(["tracking", o.number, o.trackingNumber]), shipped: (o) => sent.push(["shipped", o.number]), problem: (o, m) => sent.push(["problem", o.number, m]), paid: (o, opts) => sent.push(["paid", o.number, opts?.skipBuyer ?? false]), reserved: (o) => sent.push(["reserved", o.number]), cancelled: (o) => sent.push(["cancelled", o.number]) };
   const store = createStore(db);
-  const s = typeof stripe === "function" ? stripe(store) : stripe;
+  const s = typeof stripe === "function" ? stripe(store, { config, notifier }) : stripe;
   const sanctions = createSanctionsList(db, sanctionsFetch ? { fetchImpl: sanctionsFetch } : {});
   const partners = createPartners({ db, store, config, isBlocked: sanctions.isBlocked });
   const b = typeof bch === "function" ? bch(store, db, { partners, sanctions, notifier }) : bch;
   const shipping = createShipping({ config, db, store, notifier, stripeMode: () => (s.enabled ? (s.testMode ? "test" : "live") : null), ...(makeShippo ? { makeShippo } : {}) });
-  const app = createApp({ config, store, stripe: s, bch: b, notifier, partners, sanctions, shipping, revalidator: { status: () => ({ state: "idle" }) } });
+  const express = createExpress({ store, stripe: s, shipping });
+  const app = createApp({ config, store, stripe: s, bch: b, notifier, partners, sanctions, shipping, expressPay: express, revalidator: { status: () => ({ state: "idle" }) } });
   const server = await new Promise((resolve) => {
     const srv = app.listen(0, "127.0.0.1", () => resolve(srv));
   });

@@ -33,6 +33,11 @@ export function loadConfig(overrides = {}) {
     revalidateSecret: env.REVALIDATE_SECRET || "",
     stripeSecretKey: (env.STRIPE_SECRET_KEY || "").trim(),
     stripeWebhookSecret: (env.STRIPE_WEBHOOK_SECRET || "").trim(),
+    // Apple Pay / Google Pay on the checkout page ("express"): the publishable key (pk_test_/pk_live_, must match the secret key's mode).
+    stripePublishableKey: (env.STRIPE_PUBLISHABLE_KEY || "").trim(),
+    // Optional: a payment method configuration with Apple Pay, Google Pay and Link off (npm run card-only-config), so Stripe's own page
+    // is the card form only while the website shows the wallets above it.
+    stripeCardOnlyConfig: (env.STRIPE_CARD_ONLY_CONFIG || "").trim(),
     // Shippo (live shipping prices and labels). The test key is used whenever Stripe is in test mode, the live key only when it's live.
     shippoLiveKey: (env.SHIPPO_API_KEY || "").trim(),
     shippoTestKey: (env.SHIPPO_TEST_KEY || "").trim(),
