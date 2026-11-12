@@ -72,7 +72,18 @@ export function createExpress({ store, stripe, shipping }) {
       lines, customer, fulfillment: "ship", method: "stripe", holdMinutes: CHECKOUT_HOLD_MINUTES, minTotalCents: 50,
       shippingOverrideCents: rate.cents, shipTo, label: prepared.label, coupon: clip(coupon, 60),
     });
-    store.setOrderFields(o.id, { notes: [o.notes, "Apple Pay / Google Pay checkout.", prepared.note].filter(Boolean).join("\n") });
+    // Prices can move while the label is prepared (above): the order is only ever charged what the sheet showed.
+    if (o.totalCents !== expectedTotalCents) {
+      store.releaseOrder(o.id);
+      throw new ShopError(`The total changed to ${usd(o.totalCents)}. Please review it and pay again.`, {
+        status: 409, errors: { total: "The total changed." }, extra: { code: "total_changed", totalCents: o.totalCents, shippingCents: o.shippingCents },
+      });
+    }
+    store.setOrderFields(o.id, {
+      notes: [o.notes, "Apple Pay / Google Pay checkout.", prepared.note].filter(Boolean).join("\n"),
+      // No label to buy automatically: shown on the order in the Sell app, like a failed automatic purchase.
+      ...(prepared.label ? {} : { problem: prepared.note }),
+    });
     try {
       const pi = await stripe.createIntent(o);
       return { clientSecret: pi.client_secret, orderId: o.id, totalCents: o.totalCents, shippingCents: o.shippingCents };

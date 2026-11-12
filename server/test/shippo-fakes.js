@@ -18,6 +18,7 @@ export function fakeShippo() {
     return {
       async createShipment(body) {
         state.shipments.push(body);
+        state.onShipment?.(body);
         if (state.failShipment) throw Object.assign(new Error(state.failShipment.message), { status: state.failShipment.status });
         return { object_id: `shp_${state.shipments.length}`, rates: state.rates, messages: [] };
       },

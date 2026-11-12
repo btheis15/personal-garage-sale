@@ -500,3 +500,28 @@ describe("an express order paid another way (or cancelled) on the order page", (
     await c.t.close();
   });
 });
+
+describe("express order: what the order is placed for", () => {
+  test("a price changed while the label was being prepared: 409 and the hold is given back, no PaymentIntent", async () => {
+    const { t, f, client, item, rates, order } = await setup();
+    const it = await item();
+    const q = (await rates(it)).body;
+    f.state.onShipment = () => t.db.prepare("update items set price_cents = 4500 where id = ?").run(it.id);
+    const r = await order(it, q);
+    assert.equal(r.status, 409);
+    assert.equal(r.body.code, "total_changed");
+    assert.equal(client.calls.intents.length, 0);
+    assert.equal(t.store.getItem(it.id).quantity, 1);
+    await t.close();
+  });
+  test("a label that couldn't be prepared is a visible problem on the order", async () => {
+    const { t, f, item, rates, order } = await setup();
+    const it = await item();
+    const q = (await rates(it)).body;
+    f.state.failShipment = { status: 500, message: "Shippo is down" };
+    const r = await order(it, q);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.match(t.store.getOrder(r.body.orderId).problem ?? "", /label/i);
+    await t.close();
+  });
+});
