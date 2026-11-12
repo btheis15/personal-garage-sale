@@ -14,7 +14,7 @@ const CODES = [{ code: "TEN", kind: "percent", percent: 10, active: true }];
 
 /** A stand-in for Stripe's API client: remembers every call. */
 function fakeClient() {
-  const calls = { intents: [], sessions: [], domains: [], customers: [], coupons: [] };
+  const calls = { intents: [], sessions: [], domains: [], customers: [], coupons: [], cancels: [] };
   const state = { pi: {}, failSession: null };
   return {
     calls,
@@ -38,6 +38,13 @@ function fakeClient() {
         return pi;
       },
       retrieve: async (id) => state.pi[id],
+      cancel: async (id) => {
+        calls.cancels.push(id);
+        const pi = state.pi[id];
+        if (["succeeded", "processing", "canceled"].includes(pi.status)) throw Object.assign(new Error(`You cannot cancel this PaymentIntent because it has a status of ${pi.status}.`), { type: "StripeInvalidRequestError" });
+        pi.status = "canceled";
+        return pi;
+      },
     },
     paymentMethodDomains: { create: async (p) => (calls.domains.push(p), { id: "pmd_1" }) },
     webhooks: { constructEvent: (raw, sig) => (sig === "good" ? JSON.parse(String(raw)) : (() => { throw new Error("bad"); })()) },
@@ -429,5 +436,67 @@ describe("Sell app status", () => {
     assert.equal(s2.express.ready, false);
     assert.match(s2.express.why, /test|live/i);
     await d.t.close();
+  });
+});
+
+describe("an express order paid another way (or cancelled) on the order page", () => {
+  async function started() {
+    const ctx = await setup();
+    const it = await ctx.item();
+    const q = (await ctx.rates(it)).body;
+    const r = (await ctx.order(it, q)).body;
+    return { ...ctx, it, orderId: r.orderId };
+  }
+  test("Pay with card cancels the Apple Pay / Google Pay PaymentIntent first, so it can't also be charged", async () => {
+    const c = await started();
+    const r = await c.t.site("POST", `/api/orders/${c.orderId}/pay`, { method: "stripe" });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(c.client.calls.cancels, ["pi_test_1"]);
+    assert.equal(c.client.state.pi.pi_test_1.status, "canceled");
+    assert.equal(c.t.store.getOrder(c.orderId).stripePaymentIntent, null);
+    // Stripe's "canceled" notice for the old PaymentIntent must not cancel the order now being paid on the hosted page.
+    await rawPost(c.t, { type: "payment_intent.canceled", data: { object: { id: "pi_test_1", status: "canceled", metadata: { order_id: c.orderId } } } });
+    assert.equal(c.t.store.getOrder(c.orderId).status, "pending");
+    await c.t.close();
+  });
+  test("the wallet payment already went through (notice not here yet): recorded as paid, no second payment page", async () => {
+    const c = await started();
+    c.client.state.pi.pi_test_1.status = "succeeded";
+    const r = await c.t.site("POST", `/api/orders/${c.orderId}/pay`, { method: "stripe" });
+    assert.equal(r.status, 409);
+    assert.match(r.body.error, /already paid/);
+    assert.equal(c.client.calls.sessions.length, 0);
+    assert.equal(c.t.store.getOrder(c.orderId).status, "paid");
+    await c.t.close();
+  });
+  test("still processing: refused, nothing cancelled, no payment page", async () => {
+    const c = await started();
+    c.client.state.pi.pi_test_1.status = "processing";
+    const r = await c.t.site("POST", `/api/orders/${c.orderId}/pay`, { method: "stripe" });
+    assert.equal(r.status, 409);
+    assert.equal(c.client.calls.sessions.length, 0);
+    assert.equal(c.t.store.getOrder(c.orderId).status, "pending");
+    await c.t.close();
+  });
+  test("the hosted page charges the shipping the buyer was quoted (the order's total), even if the label costs more at the full address", async () => {
+    const ctx = await setup();
+    const it = await ctx.item();
+    const q = (await ctx.rates(it)).body;
+    ctx.f.state.rates = ctx.f.state.rates.map((x) => (x.object_id === "r_ground" ? { ...x, object_id: "r_ground_full", amount: "6.10" } : x));
+    const o = (await ctx.order(it, q)).body;
+    assert.equal(ctx.t.store.getOrder(o.orderId).label.rates[0].cents, 610);
+    const r = await ctx.t.site("POST", `/api/orders/${o.orderId}/pay`, { method: "stripe" });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const p = ctx.client.calls.sessions.at(-1);
+    assert.equal(p.shipping_options[0].shipping_rate_data.fixed_amount.amount, 525);
+    await ctx.t.close();
+  });
+  test("Cancel cancels the PaymentIntent too", async () => {
+    const c = await started();
+    const r = await c.t.site("POST", `/api/orders/${c.orderId}/cancel`, {});
+    assert.equal(r.status, 200);
+    assert.equal(r.body.status, "cancelled");
+    assert.equal(c.client.state.pi.pi_test_1.status, "canceled");
+    await c.t.close();
   });
 });

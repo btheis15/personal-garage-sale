@@ -67,7 +67,8 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
       ...(live
         ? {
             customer: stripeCustomer.id,
-            shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: live.label, fixed_amount: { amount: live.cents, currency: "usd" } } }],
+            // The order's own shipping (what the buyer was quoted), not the label's price: an express order's label can be re-priced.
+            shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: live.label, fixed_amount: { amount: order.shippingCents, currency: "usd" } } }],
           }
         : {
             ...(order.customer.email ? { customer_email: order.customer.email } : {}),
@@ -186,6 +187,29 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
     return pi.status === "succeeded" ? syncIntent(pi) : null;
   }
 
+  /**
+   * Express: the order's own PaymentIntent is given up before the buyer pays another way or cancels, so it can never also be charged.
+   * Returns the order (paid, if that payment had already gone through). Throws 409 while it's still going through.
+   */
+  async function closeIntent(order) {
+    if (!client || order.status !== "pending" || !order.stripePaymentIntent || order.stripeSessionId) return order;
+    const busy = () => Object.assign(new Error("Your Apple Pay / Google Pay payment is still going through. Please wait a minute and refresh this page."), { status: 409 });
+    let pi = await client.paymentIntents.retrieve(order.stripePaymentIntent);
+    if (pi.status !== "succeeded" && pi.status !== "canceled") {
+      if (["processing", "requires_capture"].includes(pi.status)) throw busy();
+      try {
+        pi = await client.paymentIntents.cancel(pi.id);
+      } catch {
+        pi = await client.paymentIntents.retrieve(pi.id); // paid meanwhile?
+      }
+    }
+    if (pi.status === "succeeded") return syncIntent(pi) ?? store.getOrder(order.id);
+    if (pi.status !== "canceled") throw busy();
+    // Forgotten, so its "canceled" notice doesn't cancel the order the buyer is now paying another way.
+    store.setOrderFields(order.id, { stripePaymentIntent: null });
+    return store.getOrder(order.id);
+  }
+
   /** Stripe's signed notice: checkout.session.completed / async_payment_succeeded / _failed / expired. */
   async function webhook(rawBody, signature) {
     if (!client || !config.stripeWebhookSecret) throw Object.assign(new Error("Stripe isn't set up."), { status: 400 });
@@ -204,5 +228,5 @@ export function createStripe({ config, store, notifier, makeClient = (key) => ne
     return { received: true };
   }
 
-  return { enabled, testMode, publishableKey, publishableProblem, cardOnlyConfig: Boolean(config.stripeCardOnlyConfig), start, createIntent, syncIntent, syncIntentById, sync, syncById, close, webhook };
+  return { enabled, testMode, publishableKey, publishableProblem, cardOnlyConfig: Boolean(config.stripeCardOnlyConfig), start, createIntent, closeIntent, syncIntent, syncIntentById, sync, syncById, close, webhook };
 }

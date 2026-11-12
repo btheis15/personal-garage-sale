@@ -204,6 +204,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   web.post("/orders/:id/pay", limit(20), send(async (req) => {
     let order = mustOrder(req.params.id);
     const method = req.body?.method;
+    // An Apple Pay / Google Pay order: its PaymentIntent is cancelled first (or found paid), so the buyer is never charged twice.
+    if (order.stripePaymentIntent && !order.stripeSessionId && stripe.closeIntent) order = await stripe.closeIntent(order);
     if (method === "bch" && order.stripeSessionId) order = (await stripe.close(order)) ?? order;
     if (order.status !== "pending") fail(order.status === "paid" || order.status === "completed" ? "This order is already paid." : "This order has closed.", 409);
     if (method === "stripe" && stripe.enabled) {
@@ -222,7 +224,8 @@ export function createApp({ config, store, stripe, bch, notifier, revalidator, p
   }));
 
   web.post("/orders/:id/cancel", limit(20), send(async (req) => {
-    const order = mustOrder(req.params.id);
+    let order = mustOrder(req.params.id);
+    if (order.stripePaymentIntent && !order.stripeSessionId && stripe.closeIntent) order = await stripe.closeIntent(order);
     if (!["pending", "reserved"].includes(order.status)) return { status: order.status };
     if (order.method === "bch" && bch.enabled && (await bch.payment(order.id))) {
       const view = await bch.status(order.id).catch(() => null);
