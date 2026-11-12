@@ -109,6 +109,8 @@ export type Payments = {
   liveShipping?: boolean;
   /** At least one coupon code is active, so checkout shows the "Have a code?" box. */
   couponCodes?: boolean;
+  /** Apple Pay / Google Pay express checkout is available (the publishable key for Stripe.js), else null. */
+  express?: { publishableKey: string } | null;
   /** "Spread the word" is on: friends earn this share of Bitcoin Cash sales through their link. */
   partners?: { ratePercent: number } | null;
 };

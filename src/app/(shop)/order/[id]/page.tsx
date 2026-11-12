@@ -18,6 +18,8 @@ export default async function OrderPage(props: PageProps<"/order/[id]">) {
   try {
     // Back from Stripe: ask Stripe now instead of waiting for its notice.
     if (typeof sp.session_id === "string") await shopApi(`/api/orders/${id}/stripe-return`, { method: "POST", body: { sessionId: sp.session_id } }).catch(() => null);
+    // Back from an Apple Pay / Google Pay payment: same, with the payment Stripe just confirmed.
+    else if (typeof sp.payment_intent === "string" && sp.redirect_status !== "failed") await shopApi(`/api/orders/${id}/stripe-return`, { method: "POST", body: { paymentIntent: sp.payment_intent } }).catch(() => null);
     ({ order, payments } = await shopApi<{ order: BuyerOrder; payments: Payments }>(`/api/orders/${id}`));
   } catch (e) {
     if (e instanceof ShopApiError && e.status === 404) notFound();
