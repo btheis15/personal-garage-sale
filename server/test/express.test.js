@@ -525,3 +525,14 @@ describe("express order: what the order is placed for", () => {
     await t.close();
   });
 });
+
+describe("the public feed", () => {
+  test("never carries the ship-from address, the package or the coupon codes", async () => {
+    const { t } = await setup();
+    const s = (await t.site("GET", "/api/catalog")).body.settings;
+    assert.equal(s.shipFrom, undefined);
+    assert.equal(s.package, undefined);
+    assert.equal(s.couponCodes, undefined);
+    await t.close();
+  });
+});

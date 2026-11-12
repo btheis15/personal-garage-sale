@@ -65,8 +65,8 @@ export function couponLabel(coupon) {
 /** Is any code switched on? (the website shows its "Have a code?" box only then) */
 export const anyActive = (settings) => (settings.couponCodes ?? []).some((c) => c.active);
 
-/** The settings the public site sees: the codes themselves stay private. */
-export const publicSettings = ({ couponCodes, ...rest }) => rest;
+/** The settings the public site sees: the codes, the ship-from address (Brian's own) and the packing box stay private. */
+export const publicSettings = ({ couponCodes, shipFrom, package: box, ...rest }) => rest;
 
 /** For the website's code box: what a typed code would take off this cart (prices from the database). */
 export function checkCoupon(store, { code, lines }) {
